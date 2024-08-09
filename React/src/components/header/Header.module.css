@@ -1,0 +1,143 @@
+.app-header {
+  background-color: white !important;
+  height: auto;
+  display: flex; /* 水平排列 logo-header 和 main-header */
+  align-items: flex-start; /* 顶部对齐子元素 */
+  padding: 0;
+}
+
+  .logo-header {
+    display: flex;
+    flex-direction: column; /* 垂直排列子元素 */
+    align-items: center; /* 水平居中对齐 */
+    background-color: #fff;
+  }
+
+  .logo-container {
+    position: relative;
+    height: 140px; /* 以视口宽度为基准调整整体大小 */
+    width: 140px;  /* 确保容器是一个正方形 */
+  }
+
+  .shield-logo {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%; /* 根据容器的大小自动调整 */
+    width: 100%;
+    transform: scale(1); /* 保持原始比例 */
+  }
+
+  .star-logo {
+    position: absolute;
+  }
+
+  .star1, .star2, .star3, .star4 {
+    animation: star-appear 10s infinite;
+    opacity: 0;
+  }
+
+  .star1 {
+    height: 8.33%; /* 相对于容器高度调整 */
+    width: 8.33%;  /* 与height保持一致比例 */
+    top: 55%;      /* 相对于容器高度调整 */
+    left: 78%;     /* 相对于容器宽度调整 */
+    transform: translate(-50%, -50%) rotate(35deg); /* 中心点旋转 */
+    animation-delay: 0s;
+  }
+
+  .star2 {
+    height: 6.66%; 
+    width: 6.66%;  
+    top: 70%;      
+    left: 78%;     
+    transform: translate(-50%, -50%) rotate(35deg);
+    animation-delay: 2s;
+  }
+
+  .star4 {
+    height: 10%;  
+    width: 10%;  
+    top: 76%;     
+    left: 58%;    
+    transform: translate(-50%, -50%) rotate(35deg);
+    animation-delay: 4s;
+  }
+
+  .star3 {
+    height: 8.33%; 
+    width: 8.33%;  
+    top: 60%;      
+    left: 60%;     
+    transform: translate(-50%, -50%) rotate(35deg);
+    animation-delay: 6s;
+  }
+
+  @keyframes star-appear {
+    0% { opacity: 0; }
+    12.5% { opacity: 1; } 
+    87.5% { opacity: 1; } 
+    88% { opacity: 0; }
+    100% { opacity: 0; }
+  }
+
+  .title {
+    line-height: normal !important;
+    color: #CC142B !important;
+    font-style: italic;
+    font-weight: bold;
+    font-size: 48px;
+    margin-top: -10px;
+  }
+
+  .main-header {
+    display: flex;
+    flex-direction: column; /* 垂直排列 top-header 和 main-menu */
+    flex-grow: 1; /* 占据剩余空间 */
+    height: 100%; /* 确保容器高度与父容器一致 */
+    margin-top: 25px;
+  }
+
+  .top-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background-color: #CC142B !important;
+    padding: 0 20px;
+    height: 40px;
+    width: 100%;
+    margin-bottom: 2px; /* 增加底部边距 */
+  }
+
+  .slogan {
+    color: #00247D !important;
+    font-size: 24px;
+    font-weight: bold;
+    font-family: 'Pacifico', cursive;
+    font-style: italic;
+    text-shadow: 
+      -1px -1px 0 #fff,   /* 左上角 */
+      1px -1px 0 #fff,    /* 右上角 */
+      -1px 1px 0 #fff,    /* 左下角 */
+      1px 1px 0 #fff,     /* 右下角 */
+      0px 0px 3px #fff;   /* 中心增加一点柔和的白色阴影 */
+  }
+
+  .button-language {
+    margin-left: auto;
+  }
+
+  .main-menu {
+    background-color: #00247D !important;
+    color: #f5f5f5 !important;
+    align-items: center; /* 上下居中对齐 */
+    display: flex;
+    justify-content: flex-start; /* 将菜单项整体向左对齐，使用 flex-end 则整体向右对齐 */
+    gap: 50px;
+    padding: 10px;
+    width: 100%;
+    height: 90px; /* 设置高度 */
+    font-weight: bold !important;
+    font-size: 20px !important;
+    line-height: normal !important;
+  }
