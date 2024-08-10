@@ -1,53 +1,191 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import styles from "./Header.module.css";
 import shield from "../../assets/shield.png";
 import star from "../../assets/star.png";
-import { Typography, Menu, Dropdown } from "antd";
-import { GlobalOutlined } from "@ant-design/icons";
+import { Typography } from "antd";
+import { 
+  WifiOutlined, 
+  EnvironmentOutlined, 
+  GlobalOutlined, 
+  BellOutlined, 
+  QuestionCircleOutlined, 
+  SettingOutlined, 
+  FileTextOutlined 
+} from "@ant-design/icons";
 
 export const Header: React.FC = () => {
+  const stats = {
+    networks: 0,
+    sites: 0,
+    devices: 0
+  };
+
+  const [visibleDropdown, setVisibleDropdown] = useState<string | null>(null);
+  const [location, setLocation] = useState<string>("Unknown Location");
+
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          setLocation(`Lat: ${latitude.toFixed(2)}, Lon: ${longitude.toFixed(2)}`);
+        },
+        (error) => {
+          console.error("Error fetching location:", error);
+        }
+      );
+    }
+  }, []);
+
+  const handleIconClick = (type: string) => {
+    setVisibleDropdown(visibleDropdown === type ? null : type);
+  };
+
+  const renderDropdown = (type: string, items: string[]) => {
+    return visibleDropdown === type && (
+      <div className={styles["top-list"]}>
+        {items.map((item, index) => (
+          <a href="#" className={styles["dropdown-item"]} key={index}>
+            {item}
+          </a>
+        ))}
+      </div>
+    );
+  };
+
   return (
     <div className={styles["app-header"]}>
       <div className={styles["logo-header"]}>
-        <div className={styles["logo-container"]}>
+        <div className={styles["logo-pattern"]}>
           <img src={shield} alt="shield" className={styles["shield-logo"]} />
           <img src={star} alt="star1" className={`${styles["star-logo"]} ${styles["star1"]}`} />
           <img src={star} alt="star2" className={`${styles["star-logo"]} ${styles["star2"]}`} />
           <img src={star} alt="star3" className={`${styles["star-logo"]} ${styles["star3"]}`} />
           <img src={star} alt="star4" className={`${styles["star-logo"]} ${styles["star4"]}`} />
         </div>
-        <Typography.Title level={3} className={styles.title}>
-          CruxWatch
-        </Typography.Title>
-      </div>
-      <div className={styles["main-header"]}>
-        <div className={styles["top-header"]}>
+        <div className={styles["logo-tile"]}>
+          <Typography.Title level={3} className={styles.title}>
+            CruxWatch
+          </Typography.Title>
           <Typography.Text className={styles.slogan}>
             Network Patron Saint
           </Typography.Text>
-          <Dropdown.Button
-            className={styles["button-language"]}
-            overlay={
-              <Menu
-                items={[
-                  { key: "1", label: "English" },
-                  { key: "2", label: "中文" },
-                ]}
-              />
-            }
-            icon={<GlobalOutlined />}
-          >
-            Language
-          </Dropdown.Button>
         </div>
-        <Menu mode="horizontal" className={styles["main-menu"]}>
-          <Menu.Item key="1">TopDisc</Menu.Item>
-          <Menu.Item key="2">NEList</Menu.Item>
-          <Menu.Item key="3">CfgMgmt</Menu.Item>
-          <Menu.Item key="4">PerfMon</Menu.Item>
-          <Menu.Item key="5">RelDet</Menu.Item>
-          <Menu.Item key="6">SecTst</Menu.Item>
-        </Menu>
+      </div>
+      <div className={styles["stats-header"]}>
+        <div className={styles["stats-item"]}>
+          <div className={styles["stats-number"]}>{stats.networks}</div>
+          <div className={styles["stats-label"]}>Network(s)</div>
+        </div>
+        <div className={styles["stats-item"]}>
+          <div className={styles["stats-number"]}>{stats.sites}</div>
+          <div className={styles["stats-label"]}>Site(s)</div>
+        </div>
+        <div className={styles["stats-item"]}>
+          <div className={styles["stats-number"]}>{stats.devices}</div>
+          <div className={styles["stats-label"]}>Device(s)</div>
+        </div>
+      </div>
+      <div className={styles["top-header"]}>
+        <div className={styles["top-button"]} onClick={() => handleIconClick("network")}>
+          <WifiOutlined
+            style={{
+              backgroundColor: "#D3D3D3",
+              padding: "10px",
+              borderRadius: "50%",
+              fontSize: "30px",
+              cursor: "pointer",
+            }}
+          />
+          {renderDropdown("network", [
+            "IP: 192.168.1.1",
+            "Status: Connected",
+            "Port: 8080",
+          ])}
+        </div>
+        <div className={styles["top-button"]} onClick={() => handleIconClick("location")}>
+          <EnvironmentOutlined
+            style={{
+              backgroundColor: "#D3D3D3",
+              padding: "10px",
+              borderRadius: "50%",
+              fontSize: "30px",
+              cursor: "pointer",
+            }}
+          />
+          {renderDropdown("location", [location])}
+        </div>
+        <div className={styles["top-button"]} onClick={() => handleIconClick("notifications")}>
+          <BellOutlined
+            style={{
+              backgroundColor: "#D3D3D3",
+              padding: "10px",
+              borderRadius: "50%",
+              fontSize: "30px",
+              cursor: "pointer",
+            }}
+          />
+          {renderDropdown("notifications", [
+            "No new notifications"
+          ])}
+        </div>
+        <div className={styles["top-button"]} onClick={() => handleIconClick("help")}>
+          <QuestionCircleOutlined
+            style={{
+              backgroundColor: "#D3D3D3",
+              padding: "10px",
+              borderRadius: "50%",
+              fontSize: "30px",
+              cursor: "pointer",
+            }}
+          />
+          {renderDropdown("help", [
+            "User Guide",
+            "Support"
+          ])}
+        </div>
+        <div className={styles["top-button"]} onClick={() => handleIconClick("settings")}>
+          <SettingOutlined
+            style={{
+              backgroundColor: "#D3D3D3",
+              padding: "10px",
+              borderRadius: "50%",
+              fontSize: "30px",
+              cursor: "pointer",
+            }}
+          />
+          {renderDropdown("settings", [
+            "Modules",
+            "Map"
+          ])}
+        </div>
+        <div className={styles["top-button"]} onClick={() => handleIconClick("logs")}>
+          <FileTextOutlined
+            style={{
+              backgroundColor: "#D3D3D3",
+              padding: "10px",
+              borderRadius: "50%",
+              fontSize: "30px",
+              cursor: "pointer",
+            }}
+          />
+          {renderDropdown("logs", [
+            "Recent Logs",
+            "Download"
+          ])}
+        </div>
+        <div className={styles["top-button"]} onClick={() => handleIconClick("language")}>
+          <GlobalOutlined
+            style={{
+              backgroundColor: "#D3D3D3",
+              padding: "10px",
+              borderRadius: "50%",
+              fontSize: "30px",
+              cursor: "pointer",
+            }}
+          />
+          {renderDropdown("language", ["English", "中文"])}
+        </div>
       </div>
     </div>
   );

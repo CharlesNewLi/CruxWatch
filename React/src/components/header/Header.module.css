@@ -1,22 +1,24 @@
 .app-header {
-  background-color: white !important;
-  height: auto;
+  background-color: #D3D3D3 !important;
+  height: 140px;
   display: flex; /* 水平排列 logo-header 和 main-header */
   align-items: flex-start; /* 顶部对齐子元素 */
   padding: 0;
+  margin-left: auto !important;
+  margin-right: auto !important;
 }
 
   .logo-header {
     display: flex;
-    flex-direction: column; /* 垂直排列子元素 */
+    flex-direction: row; /* 将排列方向改为水平排列 */
     align-items: center; /* 水平居中对齐 */
-    background-color: transparent !important;
   }
 
-  .logo-container {
+  .logo-pattern {
     position: relative;
     height: 140px; /* 以视口宽度为基准调整整体大小 */
     width: 140px;  /* 确保容器是一个正方形 */
+    margin-top: -20px;
   }
 
   .shield-logo {
@@ -33,7 +35,7 @@
   }
 
   .star1, .star2, .star3, .star4 {
-    animation: star-appear 10s infinite;
+    animation: star-appear 4s infinite;
     opacity: 0;
   }
 
@@ -52,7 +54,7 @@
     top: 70%;      
     left: 78%;     
     transform: translate(-50%, -50%) rotate(35deg);
-    animation-delay: 2s;
+    animation-delay: 1s;
   }
 
   .star4 {
@@ -61,7 +63,7 @@
     top: 76%;     
     left: 58%;    
     transform: translate(-50%, -50%) rotate(35deg);
-    animation-delay: 4s;
+    animation-delay: 2s;
   }
 
   .star3 {
@@ -70,7 +72,7 @@
     top: 60%;      
     left: 60%;     
     transform: translate(-50%, -50%) rotate(35deg);
-    animation-delay: 6s;
+    animation-delay: 3s;
   }
 
   @keyframes star-appear {
@@ -81,32 +83,28 @@
     100% { opacity: 0; }
   }
 
+  .logo-tile {
+    position: relative;
+    height: 140px; /* 以视口宽度为基准调整整体大小 */
+    width: auto; 
+    margin-top: 18px;
+    margin-left: -5px;
+  }
+
   .title {
     line-height: normal !important;
     color: #CC142B !important;
     font-style: italic;
-    font-weight: bold;
-    font-size: 48px;
-    margin-top: -10px;
-  }
-
-  .main-header {
-    display: flex;
-    flex-direction: column; /* 垂直排列 top-header 和 main-menu */
-    flex-grow: 1; /* 占据剩余空间 */
-    height: 100%; /* 确保容器高度与父容器一致 */
-    margin-top: 25px;
-  }
-
-  .top-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background-color: transparent !important;
-    padding: 0 20px;
-    height: 40px;
-    width: 100%;
-    margin-bottom: 2px; /* 增加底部边距 */
+    font-weight: 900 !important;
+    font-size: 40px !important;
+    text-shadow: 
+    -1px -1px 0 #fff,   /* 左上角 */
+    1px -1px 0 #fff,    /* 右上角 */
+    -1px 1px 0 #fff,    /* 左下角 */
+    1px 1px 0 #fff,     /* 右下角 */
+    0px 0px 3px #fff;   /* 中心增加一点柔和的白色阴影 */
+    margin-top: 5px !important;
+    margin-bottom: 5px !important;
   }
 
   .slogan {
@@ -123,21 +121,81 @@
       0px 0px 3px #fff;   /* 中心增加一点柔和的白色阴影 */
   }
 
-  .button-language {
-    margin-left: auto;
+  .stats-header {
+    color: #00247D;
+    display: flex;
+    justify-content: space-around; /* 平均分布 */
+    min-width: auto;
+    padding: 20px 0; /* 设置上下内边距 */
+    margin-left: 200px;
+  }
+  
+  .stats-item {
+    text-align: center;
+    margin: 0 50px; /* 左右各添加20px的间距 */
+  }
+  
+  .stats-number {
+    font-size: 48px; /* 设置大号字体 */
+    font-weight: bold;
+    color: #00247D;
   }
 
-  .main-menu {
-    background-color: #00247D !important;
-    color: #f5f5f5 !important;
-    align-items: center; /* 上下居中对齐 */
+  .stats-label {
+    font-size: 16px; /* 设置较小的字体 */
+    font-weight: bold; 
+    color: #00247D;
+    font-family: 'Arial', sans-serif; /* 设置字体风格 */
+  }
+
+  .top-header {
     display: flex;
-    justify-content: flex-start; /* 将菜单项整体向左对齐，使用 flex-end 则整体向右对齐 */
-    gap: 50px;
-    padding: 10px;
+    align-items: center;
+    justify-content: flex-end; /* 子元素向右对齐 */
+    padding: 0 20px;
+    height: 140px;
     width: 100%;
-    height: 90px; /* 设置高度 */
-    font-weight: bold !important;
-    font-size: 20px !important;
-    line-height: normal !important;
+    margin-bottom: 2px; 
+  }
+  
+  .top-button {
+    position: relative;
+    cursor: pointer;
+    background-color: inherit;
+    padding: 10px;
+    margin-right: 20px; /* 添加间距确保图标之间保持一致 */
+  }
+  
+  .top-button:last-child {
+    margin-right: 0; /* 确保最后一个按钮没有右侧间距 */
+  }
+  
+  .top-list {
+    position: absolute;
+    top: 50px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: white;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+    padding: 5px 0;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    min-width: 60px;
+  }
+  
+  .dropdown-item {
+    display: block;
+    padding: 5px 10px;
+    color: #333;
+    text-align: center;
+    text-decoration: none;
+    background-color: inherit;
+    transition: background-color 0.2s;
+  }
+  
+  .dropdown-item:hover {
+    background-color: #f0f0f0;
   }
