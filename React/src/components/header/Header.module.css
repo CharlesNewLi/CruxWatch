@@ -1,15 +1,18 @@
 .app-header {
-  background-color: #D3D3D3 !important;
+  background-color: #A9A9A9 !important;
   height: 140px;
+  width: 100%;
   display: flex; /* 水平排列 logo-header 和 main-header */
   align-items: flex-start; /* 顶部对齐子元素 */
   padding: 0;
   margin-left: auto !important;
   margin-right: auto !important;
+  box-sizing: border-box; /* 确保 padding 不影响宽度计算 */
 }
 
   .logo-header {
     display: flex;
+    width: auto;
     flex-direction: row; /* 将排列方向改为水平排列 */
     align-items: center; /* 水平居中对齐 */
   }
@@ -127,7 +130,7 @@
     justify-content: space-around; /* 平均分布 */
     min-width: auto;
     padding: 20px 0; /* 设置上下内边距 */
-    margin-left: 200px;
+    margin: 0 10px; /* 子容器左右各有 10px 的外边距 */
   }
   
   .stats-item {
@@ -151,28 +154,33 @@
   .top-header {
     display: flex;
     align-items: center;
-    justify-content: flex-end; /* 子元素向右对齐 */
+    justify-content: space-between; /* 子元素之间均匀分布 */
     padding: 0 20px;
     height: 140px;
-    width: 100%;
+    width: auto;
     margin-bottom: 2px; 
+    margin-right: 0;
   }
   
   .top-button {
     position: relative;
-    cursor: pointer;
-    background-color: inherit;
     padding: 10px;
-    margin-right: 20px; /* 添加间距确保图标之间保持一致 */
+    flex-grow: 1; /* 让每个按钮占据等量的可用空间 */
+    text-align: center; /* 确保内容在按钮内居中 */
+    margin-right: auto;
+  }
+
+  .button-icon {
+    color: white !important;
+    padding: 15px;
+    border-radius: 50%;
+    font-size: 30px !important;
+    cursor: pointer;
   }
   
-  .top-button:last-child {
-    margin-right: 0; /* 确保最后一个按钮没有右侧间距 */
-  }
-  
-  .top-list {
+  .menu-list {
     position: absolute;
-    top: 50px;
+    top: 60px;
     left: 50%;
     transform: translateX(-50%);
     background-color: white;

@@ -3,15 +3,8 @@ import styles from "./Header.module.css";
 import shield from "../../assets/shield.png";
 import star from "../../assets/star.png";
 import { Typography } from "antd";
-import { 
-  WifiOutlined, 
-  EnvironmentOutlined, 
-  GlobalOutlined, 
-  BellOutlined, 
-  QuestionCircleOutlined, 
-  SettingOutlined, 
-  FileTextOutlined 
-} from "@ant-design/icons";
+import { WifiOutlined, EnvironmentOutlined, GlobalOutlined, BellOutlined, 
+         QuestionCircleOutlined, SettingOutlined, FileTextOutlined } from "@ant-design/icons";
 
 export const Header: React.FC = () => {
   const stats = {
@@ -43,7 +36,7 @@ export const Header: React.FC = () => {
 
   const renderDropdown = (type: string, items: string[]) => {
     return visibleDropdown === type && (
-      <div className={styles["top-list"]}>
+      <div className={styles["menu-list"]}>
         {items.map((item, index) => (
           <a href="#" className={styles["dropdown-item"]} key={index}>
             {item}
@@ -88,15 +81,7 @@ export const Header: React.FC = () => {
       </div>
       <div className={styles["top-header"]}>
         <div className={styles["top-button"]} onClick={() => handleIconClick("network")}>
-          <WifiOutlined
-            style={{
-              backgroundColor: "#D3D3D3",
-              padding: "10px",
-              borderRadius: "50%",
-              fontSize: "30px",
-              cursor: "pointer",
-            }}
-          />
+          <WifiOutlined className={styles["button-icon"]}/>
           {renderDropdown("network", [
             "IP: 192.168.1.1",
             "Status: Connected",
@@ -104,86 +89,38 @@ export const Header: React.FC = () => {
           ])}
         </div>
         <div className={styles["top-button"]} onClick={() => handleIconClick("location")}>
-          <EnvironmentOutlined
-            style={{
-              backgroundColor: "#D3D3D3",
-              padding: "10px",
-              borderRadius: "50%",
-              fontSize: "30px",
-              cursor: "pointer",
-            }}
-          />
+          <EnvironmentOutlined className={styles["button-icon"]}/>
           {renderDropdown("location", [location])}
         </div>
         <div className={styles["top-button"]} onClick={() => handleIconClick("notifications")}>
-          <BellOutlined
-            style={{
-              backgroundColor: "#D3D3D3",
-              padding: "10px",
-              borderRadius: "50%",
-              fontSize: "30px",
-              cursor: "pointer",
-            }}
-          />
+          <BellOutlined className={styles["button-icon"]}/>
           {renderDropdown("notifications", [
             "No new notifications"
           ])}
         </div>
         <div className={styles["top-button"]} onClick={() => handleIconClick("help")}>
-          <QuestionCircleOutlined
-            style={{
-              backgroundColor: "#D3D3D3",
-              padding: "10px",
-              borderRadius: "50%",
-              fontSize: "30px",
-              cursor: "pointer",
-            }}
-          />
+          <QuestionCircleOutlined className={styles["button-icon"]}/>
           {renderDropdown("help", [
             "User Guide",
             "Support"
           ])}
         </div>
         <div className={styles["top-button"]} onClick={() => handleIconClick("settings")}>
-          <SettingOutlined
-            style={{
-              backgroundColor: "#D3D3D3",
-              padding: "10px",
-              borderRadius: "50%",
-              fontSize: "30px",
-              cursor: "pointer",
-            }}
-          />
+          <SettingOutlined className={styles["button-icon"]}/>
           {renderDropdown("settings", [
             "Modules",
             "Map"
           ])}
         </div>
         <div className={styles["top-button"]} onClick={() => handleIconClick("logs")}>
-          <FileTextOutlined
-            style={{
-              backgroundColor: "#D3D3D3",
-              padding: "10px",
-              borderRadius: "50%",
-              fontSize: "30px",
-              cursor: "pointer",
-            }}
-          />
+          <FileTextOutlined className={styles["button-icon"]}/>
           {renderDropdown("logs", [
             "Recent Logs",
             "Download"
           ])}
         </div>
         <div className={styles["top-button"]} onClick={() => handleIconClick("language")}>
-          <GlobalOutlined
-            style={{
-              backgroundColor: "#D3D3D3",
-              padding: "10px",
-              borderRadius: "50%",
-              fontSize: "30px",
-              cursor: "pointer",
-            }}
-          />
+          <GlobalOutlined className={styles["button-icon"]}/>
           {renderDropdown("language", ["English", "中文"])}
         </div>
       </div>
