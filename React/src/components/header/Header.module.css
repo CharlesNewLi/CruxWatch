@@ -1,5 +1,5 @@
 .app-header {
-  background-color: #A9A9A9 !important;
+  background-color: #00247D !important;
   height: 140px;
   width: 100%;
   display: flex; /* 水平排列 logo-header 和 main-header */
@@ -43,8 +43,8 @@
   }
 
   .star1 {
-    height: 8.33%; /* 相对于容器高度调整 */
-    width: 8.33%;  /* 与height保持一致比例 */
+    height: 10%; /* 相对于容器高度调整 */
+    width: 10%;  /* 与height保持一致比例 */
     top: 55%;      /* 相对于容器高度调整 */
     left: 78%;     /* 相对于容器宽度调整 */
     transform: translate(-50%, -50%) rotate(35deg); /* 中心点旋转 */
@@ -52,17 +52,17 @@
   }
 
   .star2 {
-    height: 6.66%; 
-    width: 6.66%;  
-    top: 70%;      
+    height: 8%; 
+    width: 8%;  
+    top: 69%;      
     left: 78%;     
     transform: translate(-50%, -50%) rotate(35deg);
     animation-delay: 1s;
   }
 
   .star4 {
-    height: 10%;  
-    width: 10%;  
+    height: 12%;  
+    width: 12%;  
     top: 76%;     
     left: 58%;    
     transform: translate(-50%, -50%) rotate(35deg);
@@ -70,8 +70,8 @@
   }
 
   .star3 {
-    height: 8.33%; 
-    width: 8.33%;  
+    height: 10%; 
+    width: 10%;  
     top: 60%;      
     left: 60%;     
     transform: translate(-50%, -50%) rotate(35deg);
@@ -96,22 +96,16 @@
 
   .title {
     line-height: normal !important;
-    color: #CC142B !important;
+    color: white !important;
     font-style: italic;
     font-weight: 900 !important;
     font-size: 40px !important;
-    text-shadow: 
-    -1px -1px 0 #fff,   /* 左上角 */
-    1px -1px 0 #fff,    /* 右上角 */
-    -1px 1px 0 #fff,    /* 左下角 */
-    1px 1px 0 #fff,     /* 右下角 */
-    0px 0px 3px #fff;   /* 中心增加一点柔和的白色阴影 */
     margin-top: 5px !important;
     margin-bottom: 5px !important;
   }
 
   .slogan {
-    color: #00247D !important;
+    color: #CC142B !important;
     font-size: 24px;
     font-weight: bold;
     font-family: 'Pacifico', cursive;
@@ -141,13 +135,13 @@
   .stats-number {
     font-size: 48px; /* 设置大号字体 */
     font-weight: bold;
-    color: #00247D;
+    color: white;
   }
 
   .stats-label {
     font-size: 16px; /* 设置较小的字体 */
     font-weight: bold; 
-    color: #00247D;
+    color: white;
     font-family: 'Arial', sans-serif; /* 设置字体风格 */
   }
 

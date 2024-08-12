@@ -92,19 +92,6 @@ export const Header: React.FC = () => {
           <EnvironmentOutlined className={styles["button-icon"]}/>
           {renderDropdown("location", [location])}
         </div>
-        <div className={styles["top-button"]} onClick={() => handleIconClick("notifications")}>
-          <BellOutlined className={styles["button-icon"]}/>
-          {renderDropdown("notifications", [
-            "No new notifications"
-          ])}
-        </div>
-        <div className={styles["top-button"]} onClick={() => handleIconClick("help")}>
-          <QuestionCircleOutlined className={styles["button-icon"]}/>
-          {renderDropdown("help", [
-            "User Guide",
-            "Support"
-          ])}
-        </div>
         <div className={styles["top-button"]} onClick={() => handleIconClick("settings")}>
           <SettingOutlined className={styles["button-icon"]}/>
           {renderDropdown("settings", [
@@ -117,6 +104,19 @@ export const Header: React.FC = () => {
           {renderDropdown("logs", [
             "Recent Logs",
             "Download"
+          ])}
+        </div>
+        <div className={styles["top-button"]} onClick={() => handleIconClick("notifications")}>
+          <BellOutlined className={styles["button-icon"]}/>
+          {renderDropdown("notifications", [
+            "No new notifications"
+          ])}
+        </div>
+        <div className={styles["top-button"]} onClick={() => handleIconClick("help")}>
+          <QuestionCircleOutlined className={styles["button-icon"]}/>
+          {renderDropdown("help", [
+            "User Guide",
+            "Support"
           ])}
         </div>
         <div className={styles["top-button"]} onClick={() => handleIconClick("language")}>
