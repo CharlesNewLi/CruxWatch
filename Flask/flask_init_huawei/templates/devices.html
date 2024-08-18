@@ -6,6 +6,7 @@
 </head>
 <body>
     <h1>Network Device Manager</h1>
+    
     <h2>Devices</h2>
     <div id="device-list">
         {% for device in devices %}
@@ -23,7 +24,7 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Discover Neighbors
+            // Discover neighbors when the button is clicked
             document.getElementById('discover-neighbors').addEventListener('click', function() {
                 fetch('/devices/discover', {
                     method: 'POST',
@@ -32,7 +33,7 @@
                 .then(data => {
                     if (data.status === 'success') {
                         alert('Neighbors discovered: ' + data.neighbors.join(', '));
-                        updateDeviceList(); // 动态更新设备列表
+                        updateDeviceList(); // Update the device list dynamically
                     } else {
                         alert('Failed to discover neighbors.');
                     }
@@ -40,7 +41,7 @@
                 .catch(error => console.error('Error:', error));
             });
 
-            // 更新设备列表的函数
+            // Function to update the device list dynamically
             function updateDeviceList() {
                 fetch('/devices')
                 .then(response => response.text())
@@ -50,20 +51,19 @@
                     const newDeviceList = doc.getElementById('device-list').innerHTML;
                     document.getElementById('device-list').innerHTML = newDeviceList;
 
-                    // 重新绑定事件
+                    // Rebind actions to the newly loaded device elements
                     bindDeviceActions();
                 })
                 .catch(error => console.error('Error:', error));
             }
 
-            // 绑定设备操作的函数
+            // Bind actions to device buttons for fetching info and config
             function bindDeviceActions() {
-                // Get Info (SNMP)
+                // Fetch SNMP information
                 document.querySelectorAll('.get-info').forEach(button => {
                     button.addEventListener('click', function() {
                         var deviceName = this.parentElement.getAttribute('data-device-name');
                         if (deviceName) {
-                            window.open(`/device/${deviceName}/Info`, '_blank');
                             fetch(`/device/${deviceName}/Info`)
                             .then(response => response.json())
                             .then(data => {
@@ -80,15 +80,13 @@
                     });
                 });
 
-                // Get Config (SSH via HR1)
+                // Fetch device configuration via SSH
                 document.querySelectorAll('.get-config').forEach(button => {
                     button.addEventListener('click', function() {
                         var deviceName = this.parentElement.getAttribute('data-device-name');
                         if (deviceName) {
-                            // 使用 GET 请求而不是 POST 请求
-                            window.open(`/device/${deviceName}/Config`, '_blank');
                             fetch(`/device/${deviceName}/Config`, {
-                                method: 'GET', // 将方法改为 GET
+                                method: 'GET',
                             })
                             .then(response => response.json())
                             .then(data => {
@@ -106,7 +104,7 @@
                 });
             }
             
-            // 初始绑定事件
+            // Initial binding of actions to device buttons
             bindDeviceActions();
         });
     </script>
