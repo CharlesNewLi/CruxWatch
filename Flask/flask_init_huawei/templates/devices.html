@@ -6,7 +6,6 @@
 </head>
 <body>
     <h1>Network Device Manager</h1>
-    
     <h2>Devices</h2>
     <div id="device-list">
         {% for device in devices %}
@@ -24,7 +23,7 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Discover neighbors when the button is clicked
+            // Trigger neighbor discovery on button click
             document.getElementById('discover-neighbors').addEventListener('click', function() {
                 fetch('/devices/discover', {
                     method: 'POST',
@@ -33,7 +32,7 @@
                 .then(data => {
                     if (data.status === 'success') {
                         alert('Neighbors discovered: ' + data.neighbors.join(', '));
-                        updateDeviceList(); // Update the device list dynamically
+                        updateDeviceList(); // Dynamically update the device list
                     } else {
                         alert('Failed to discover neighbors.');
                     }
@@ -41,7 +40,7 @@
                 .catch(error => console.error('Error:', error));
             });
 
-            // Function to update the device list dynamically
+            // Function to update the device list
             function updateDeviceList() {
                 fetch('/devices')
                 .then(response => response.text())
@@ -51,19 +50,20 @@
                     const newDeviceList = doc.getElementById('device-list').innerHTML;
                     document.getElementById('device-list').innerHTML = newDeviceList;
 
-                    // Rebind actions to the newly loaded device elements
+                    // Rebind event handlers after updating the list
                     bindDeviceActions();
                 })
                 .catch(error => console.error('Error:', error));
             }
 
-            // Bind actions to device buttons for fetching info and config
+            // Bind actions to device buttons
             function bindDeviceActions() {
-                // Fetch SNMP information
+                // Fetch SNMP information for the device
                 document.querySelectorAll('.get-info').forEach(button => {
                     button.addEventListener('click', function() {
                         var deviceName = this.parentElement.getAttribute('data-device-name');
                         if (deviceName) {
+                            window.open(`/device/${deviceName}/Info`, '_blank');
                             fetch(`/device/${deviceName}/Info`)
                             .then(response => response.json())
                             .then(data => {
@@ -85,8 +85,9 @@
                     button.addEventListener('click', function() {
                         var deviceName = this.parentElement.getAttribute('data-device-name');
                         if (deviceName) {
+                            window.open(`/device/${deviceName}/Config`, '_blank');
                             fetch(`/device/${deviceName}/Config`, {
-                                method: 'GET',
+                                method: 'GET', // Use GET method
                             })
                             .then(response => response.json())
                             .then(data => {
