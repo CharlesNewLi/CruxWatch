@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configure Device - {{ device_name }}</title>
+</head>
+<body>
+    <h1>Configure Device - {{ device_name }}</h1>
+
+    <form action="/device/{{ device_name }}/Config" method="POST">
+        <label for="command">Enter Command:</label><br>
+        <input type="text" id="command" name="command" placeholder="e.g., display current-configuration"><br>
+        <button type="submit">Send Command</button>
+    </form>
+
+    {% if result %}
+        <h2>Command Result:</h2>
+        <pre>{{ result | safe }}</pre>
+    {% endif %}
+</body>
+</html>

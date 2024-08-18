@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Network Device Manager</title>
+</head>
+<body>
+    <h1>Network Device Manager</h1>
+    <h2>Devices</h2>
+    <div id="device-list">
+        {% for device in devices %}
+            <div class="device" data-device-name="{{ device.name }}">
+                <h3>{{ device.name }}</h3>
+                <p>IP Address: {{ device.ssh_ip }}</p>
+                <button class="get-info">Get Info (SNMP)</button>
+                <button class="get-config">Get Config (SSH)</button>
+            </div>
+        {% endfor %}
+    </div>
+
+    <h2>Discover Neighbors</h2>
+    <button id="discover-neighbors">Discover Neighbors</button>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Discover Neighbors
+            document.getElementById('discover-neighbors').addEventListener('click', function() {
+                fetch('/devices/discover', {
+                    method: 'POST',
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        alert('Neighbors discovered: ' + data.neighbors.join(', '));
+                        updateDeviceList(); // 动态更新设备列表
+                    } else {
+                        alert('Failed to discover neighbors.');
+                    }
+                })
+                .catch(error => console.error('Error:', error));
+            });
+
+            // 更新设备列表的函数
+            function updateDeviceList() {
+                fetch('/devices')
+                .then(response => response.text())
+                .then(html => {
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    const newDeviceList = doc.getElementById('device-list').innerHTML;
+                    document.getElementById('device-list').innerHTML = newDeviceList;
+
+                    // 重新绑定事件
+                    bindDeviceActions();
+                })
+                .catch(error => console.error('Error:', error));
+            }
+
+            // 绑定设备操作的函数
+            function bindDeviceActions() {
+                // Get Info (SNMP)
+                document.querySelectorAll('.get-info').forEach(button => {
+                    button.addEventListener('click', function() {
+                        var deviceName = this.parentElement.getAttribute('data-device-name');
+                        if (deviceName) {
+                            window.open(`/device/${deviceName}/Info`, '_blank');
+                            fetch(`/device/${deviceName}/Info`)
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.status === 'success') {
+                                    alert('Device Info: ' + JSON.stringify(data.data, null, 4));
+                                } else {
+                                    alert('Failed to get info for ' + deviceName);
+                                }
+                            })
+                            .catch(error => console.error('Error:', error));
+                        } else {
+                            alert('Device name is missing!');
+                        }
+                    });
+                });
+
+                // Get Config (SSH via HR1)
+                document.querySelectorAll('.get-config').forEach(button => {
+                    button.addEventListener('click', function() {
+                        var deviceName = this.parentElement.getAttribute('data-device-name');
+                        if (deviceName) {
+                            // 使用 GET 请求而不是 POST 请求
+                            window.open(`/device/${deviceName}/Config`, '_blank');
+                            fetch(`/device/${deviceName}/Config`, {
+                                method: 'GET', // 将方法改为 GET
+                            })
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.status === 'success') {
+                                    alert('Device Config: ' + data.output);
+                                } else {
+                                    alert('Failed to get config for ' + deviceName + ': ' + data.error);
+                                }
+                            })
+                            .catch(error => console.error('Error:', error));
+                        } else {
+                            alert('Device name is missing!');
+                        }
+                    });
+                });
+            }
+            
+            // 初始绑定事件
+            bindDeviceActions();
+        });
+    </script>
+</body>
+</html>
