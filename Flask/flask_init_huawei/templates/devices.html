@@ -6,107 +6,194 @@
 </head>
 <body>
     <h1>Network Device Manager</h1>
-    <h2>Devices</h2>
-    <div id="device-list">
-        {% for device in devices %}
-            <div class="device" data-device-name="{{ device.name }}">
-                <h3>{{ device.name }}</h3>
-                <p>IP Address: {{ device.ssh_ip }}</p>
-                <button class="get-info">Get Info (SNMP)</button>
-                <button class="get-config">Get Config (SSH)</button>
-            </div>
-        {% endfor %}
+
+    <!-- SSH Credentials Form -->
+    <div id="ssh-credentials">
+        <h2>Add Gateway Device (SSH)</h2>
+        <form id="add-device-form">
+            <input type="text" id="device-type" placeholder="Device Type" required>
+            <input type="text" id="device-name" placeholder="Device Name" required>
+            <input type="text" id="ssh-ip" placeholder="SSH IP Address" required>
+            <input type="text" id="ssh-username" placeholder="SSH Username" required>
+            <input type="password" id="ssh-password" placeholder="SSH Password" required>
+            <input type="text" id="ssh-secret" placeholder="SSH Secret (Optional)">
+            <button type="submit">Add Gateway Device</button>
+        </form>
+    </div>
+    
+    <!-- SNMP Configuration Modal -->
+    <div id="snmp-modal" style="display: none;">
+        <h2>Configure SNMP</h2>
+        <form id="snmp-form">
+            <input type="text" id="snmp-ip" placeholder="SNMP IP Address" required>
+            <input type="text" id="snmp-username" placeholder="SNMP Username" required>
+            <input type="text" id="snmp-auth-protocol" placeholder="SNMP Auth Protocol (SHA/MD5)" required>
+            <input type="password" id="snmp-auth-password" placeholder="SNMP Auth Password" required>
+            <input type="text" id="snmp-priv-protocol" placeholder="SNMP Priv Protocol (AES128/DES)" required>
+            <input type="password" id="snmp-priv-password" placeholder="SNMP Priv Password" required>
+            <input type="hidden" id="snmp-device-name">
+            <button type="submit">Submit</button>
+            <button type="button" id="snmp-cancel">Cancel</button>
+        </form>
     </div>
 
-    <h2>Discover Neighbors</h2>
-    <button id="discover-neighbors">Discover Neighbors</button>
+    <h2>Devices</h2>
+    <div id="device-list">
+        <!-- Dynamically filled by JavaScript -->
+    </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Trigger neighbor discovery on button click
-            document.getElementById('discover-neighbors').addEventListener('click', function() {
-                fetch('/devices/discover', {
+            // Add Gateway Device
+            document.getElementById('add-device-form').addEventListener('submit', function(event) {
+                event.preventDefault();
+                
+                const deviceData = {
+                    name: document.getElementById('device-name').value,
+                    ssh_ip: document.getElementById('ssh-ip').value,
+                    device_type: document.getElementById('device-type').value,
+                    ssh_username: document.getElementById('ssh-username').value,
+                    ssh_password: document.getElementById('ssh-password').value,
+                    ssh_secret: document.getElementById('ssh-secret').value
+                };
+                
+                fetch('/devices/add', {
                     method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(deviceData),
                 })
                 .then(response => response.json())
                 .then(data => {
                     if (data.status === 'success') {
-                        alert('Neighbors discovered: ' + data.neighbors.join(', '));
-                        updateDeviceList(); // Dynamically update the device list
+                        alert(data.message);
+                        updateDeviceList(data.devices);
                     } else {
-                        alert('Failed to discover neighbors.');
+                        alert(data.error);
                     }
                 })
                 .catch(error => console.error('Error:', error));
             });
 
             // Function to update the device list
-            function updateDeviceList() {
-                fetch('/devices')
-                .then(response => response.text())
-                .then(html => {
-                    const parser = new DOMParser();
-                    const doc = parser.parseFromString(html, 'text/html');
-                    const newDeviceList = doc.getElementById('device-list').innerHTML;
-                    document.getElementById('device-list').innerHTML = newDeviceList;
+            function updateDeviceList(devices) {
+                console.log(devices); // 调试输出，检查 devices 数据是否正确
+                const deviceListDiv = document.getElementById('device-list');
+                deviceListDiv.innerHTML = '';
 
-                    // Rebind event handlers after updating the list
-                    bindDeviceActions();
+                devices.forEach(device => {
+                    const deviceDiv = document.createElement('div');
+                    deviceDiv.classList.add('device');
+                    deviceDiv.setAttribute('data-device-name', device.name);
+
+                    const deviceName = document.createElement('h3');
+                    deviceName.textContent = device.name;
+
+                    const deviceIp = document.createElement('p');
+                    deviceIp.textContent = `IP Address: ${device.ssh_ip}`;
+
+                    const getConfigButton = document.createElement('button');
+                    getConfigButton.classList.add('get-config');
+                    getConfigButton.textContent = 'Get Config (SSH)';
+                    getConfigButton.addEventListener('click', function() {
+                        const url = `/device/${device.name}/Config`;
+                        window.open(url, '_blank');
+                    });
+
+                    const setSnmpButton = document.createElement('button');
+                    setSnmpButton.classList.add('set-snmp');
+                    setSnmpButton.textContent = 'Set SNMP';
+                    setSnmpButton.addEventListener('click', function() {
+                        document.getElementById('snmp-modal').style.display = 'block';
+                        document.getElementById('snmp-device-name').value = device.name;
+                    });
+
+                    deviceDiv.appendChild(deviceName);
+                    deviceDiv.appendChild(deviceIp);
+                    deviceDiv.appendChild(getConfigButton);
+                    deviceDiv.appendChild(setSnmpButton);
+
+                    if (device.snmp_username) {
+                        const getInfoButton = document.createElement('button');
+                        getInfoButton.classList.add('get-info');
+                        getInfoButton.textContent = 'Get Info (SNMP)';
+                        getInfoButton.addEventListener('click', function() {
+                            const url = `/device/${device.name}/Info`;
+                            window.open(url, '_blank');
+                        });
+
+                        const discoverNeighborButton = document.createElement('button');
+                        discoverNeighborButton.classList.add('discover-neighbor');
+                        discoverNeighborButton.textContent = 'Discover Neighbor';
+                        discoverNeighborButton.addEventListener('click', function() {
+                            const deviceName = device.name;
+                            
+                            fetch('/devices/discover', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',  // 添加这行确保 Content-Type 被正确设置
+                                },
+                                body: JSON.stringify({ device_name: deviceName }),  // 传递 JSON 数据
+                            })
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.status === 'success') {
+                                    alert('Discovered Neighbors: ' + data.neighbors.join(', '));
+                                    updateDeviceList(data.devices);
+                                } else {
+                                    alert('Failed to discover neighbors.');
+                                }
+                            })
+                            .catch(error => console.error('Error:', error));
+                        });
+
+                        deviceDiv.appendChild(getInfoButton);
+                        deviceDiv.appendChild(discoverNeighborButton);
+                    }
+
+                    deviceListDiv.appendChild(deviceDiv);
+                });
+            }
+
+            // Handle form submission
+            document.getElementById('snmp-form').addEventListener('submit', function(event) {
+                event.preventDefault();
+                
+                const snmpData = {
+                    snmp_ip: document.getElementById('snmp-ip').value,
+                    snmp_username: document.getElementById('snmp-username').value,
+                    snmp_auth_protocol: document.getElementById('snmp-auth-protocol').value,
+                    snmp_auth_password: document.getElementById('snmp-auth-password').value,
+                    snmp_priv_protocol: document.getElementById('snmp-priv-protocol').value,
+                    snmp_priv_password: document.getElementById('snmp-priv-password').value,
+                    device_name: document.getElementById('snmp-device-name').value
+                };
+
+                fetch('/devices/set_snmp', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(snmpData),
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        alert('SNMP setup successful.');
+                        updateDeviceList(data.devices);
+                        document.getElementById('snmp-modal').style.display = 'none';
+                    } else {
+                        alert(data.error);
+                    }
                 })
                 .catch(error => console.error('Error:', error));
-            }
+            });
 
-            // Bind actions to device buttons
-            function bindDeviceActions() {
-                // Fetch SNMP information for the device
-                document.querySelectorAll('.get-info').forEach(button => {
-                    button.addEventListener('click', function() {
-                        var deviceName = this.parentElement.getAttribute('data-device-name');
-                        if (deviceName) {
-                            window.open(`/device/${deviceName}/Info`, '_blank');
-                            fetch(`/device/${deviceName}/Info`)
-                            .then(response => response.json())
-                            .then(data => {
-                                if (data.status === 'success') {
-                                    alert('Device Info: ' + JSON.stringify(data.data, null, 4));
-                                } else {
-                                    alert('Failed to get info for ' + deviceName);
-                                }
-                            })
-                            .catch(error => console.error('Error:', error));
-                        } else {
-                            alert('Device name is missing!');
-                        }
-                    });
-                });
-
-                // Fetch device configuration via SSH
-                document.querySelectorAll('.get-config').forEach(button => {
-                    button.addEventListener('click', function() {
-                        var deviceName = this.parentElement.getAttribute('data-device-name');
-                        if (deviceName) {
-                            window.open(`/device/${deviceName}/Config`, '_blank');
-                            fetch(`/device/${deviceName}/Config`, {
-                                method: 'GET', // Use GET method
-                            })
-                            .then(response => response.json())
-                            .then(data => {
-                                if (data.status === 'success') {
-                                    alert('Device Config: ' + data.output);
-                                } else {
-                                    alert('Failed to get config for ' + deviceName + ': ' + data.error);
-                                }
-                            })
-                            .catch(error => console.error('Error:', error));
-                        } else {
-                            alert('Device name is missing!');
-                        }
-                    });
-                });
-            }
-            
-            // Initial binding of actions to device buttons
-            bindDeviceActions();
+            // Handle form cancel
+            document.getElementById('snmp-cancel').addEventListener('click', function() {
+                document.getElementById('snmp-modal').style.display = 'none';
+            });
         });
     </script>
 </body>

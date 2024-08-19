@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Device Info</title>
+</head>
+<body>
+    <h1>Device Info: {{ device_name }}</h1>
+
+    {% if data %}
+        <pre>{{ data | tojson(indent=4) }}</pre>
+    {% elif error %}
+        <p>Error: {{ error }}</p>
+    {% else %}
+        <p>No data available for this device.</p>
+    {% endif %}
+</body>
+</html>
