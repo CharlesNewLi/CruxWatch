@@ -1,3 +1,5 @@
+# Python/Flask specific ignores
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -25,8 +27,6 @@ wheels/
 *.egg
 
 # PyInstaller
-# Usually these files are written by a python script from a template
-# before PyInstaller builds the exe, so as to inject date/other infos into it.
 *.manifest
 *.spec
 
@@ -80,7 +80,7 @@ ipython_config.py
 *.iml
 
 # Emacs
-*~ 
+*~
 \#*\#
 
 # VSCode
@@ -125,3 +125,31 @@ celerybeat.pid
 
 # Local stack-based deployments
 .localstack/
+
+# React specific ignores
+
+# Dependencies
+React/node_modules/
+React/npm-debug.log*
+React/yarn-debug.log*
+React/yarn-error.log*
+
+# Production build output
+React/build/
+
+# Miscellaneous
+React/public/
+
+# Generated files
+React/package-lock.json
+React/yarn.lock
+
+# Environment variables
+React/.env
+React/.env.local
+React/.env.development
+React/.env.test
+React/.env.production
+React/.env.development.local
+React/.env.test.local
+React/.env.production.local
