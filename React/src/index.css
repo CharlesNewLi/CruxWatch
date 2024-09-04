@@ -11,3 +11,8 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+
+@font-face {
+  font-family: 'Julius Sans One';
+  src: local('JuliusSansOne-Regular'), url(./assets/fonts/JuliusSansOne-Regular.ttf) format('truetype');
+}

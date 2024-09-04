@@ -1,0 +1,60 @@
+.search-container {
+  background: linear-gradient(to bottom, #00247d 83%, transparent 17%); /* 上半部分白色，下半部分浅灰色 */
+}
+
+  .search-block {
+    width: 1230px;
+    display: flex;
+    flex-direction: column; /* 子元素垂直排列 */
+    align-items: flex-start;
+    justify-content: center;
+    padding: 10px;
+    margin: auto auto;
+  }
+
+  .search-text {
+    display: flex;
+    flex-direction: column; /* 子元素垂直排列 */
+    align-items: flex-start;
+    justify-content: center;
+    margin-left: 1%;
+    margin-bottom: 2%;
+  }
+
+  .search-title {
+    color: white !important;
+    font-family: 'Josefin Sans', sans-serif;
+    font-size: 55px !important;
+    font-weight: bold !important;
+    margin-top: 20px !important;
+  }
+
+  .search-subtitle {
+    color: white !important;
+    font-family: 'Josefin Sans', sans-serif;
+    font-size: 25px;
+  }
+
+.page-content {
+    width: 1230px;
+    margin-left: auto;
+    margin-right: auto;
+    min-height: 75vh;
+    padding: 24px;
+  }
+
+  .section-title {
+    font-size: 24px !important;
+    font-family: 'Julius Sans One', sans-serif !important;
+    margin-bottom: auto !important;
+  }
+  
+  .section-subtitle {
+    color: #888 !important;
+    margin-bottom: auto !important;
+  }
+
+  .offer-button {
+    background-color: #00247d !important;
+    border-radius: 5px !important;
+  }

@@ -119,10 +119,6 @@ export const Header: React.FC = () => {
             "Support"
           ])}
         </div>
-        <div className={styles["top-button"]} onClick={() => handleIconClick("language")}>
-          <GlobalOutlined className={styles["button-icon"]}/>
-          {renderDropdown("language", ["English", "中文"])}
-        </div>
       </div>
     </div>
   );
