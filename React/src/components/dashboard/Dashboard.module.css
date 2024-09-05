@@ -1,0 +1,80 @@
+.outer {
+    display: flex;
+    margin-top: 2px;
+    margin-bottom: 3%;
+    height: 300px; /* 保持卡片的固定高度 */
+    width: 1230px;
+    font-family: 'Josefin Sans', sans-serif;
+}
+
+.inner_large {
+    flex: 2; /* 左侧大组件占用2份空间 */
+    height: 100%;
+    background-color: #00247D;
+    border-radius: 8px !important;
+    font-size: large;
+    transform: translateZ(0); /* 确保3D效果正确应用 */
+    transition: transform 0.25s ease-out; /* 控制 transform 属性的过渡效果 */
+    position: relative;
+    margin-right: 1%;
+}
+
+.inner_large:hover {
+    transform: scale(1.05); /* 鼠标悬停时，放大元素 */
+}
+
+.small_container {
+    flex: 3; /* 右侧小组件容器占用3份空间 */
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3% 1%;
+    height: 100%;
+}
+
+.inner_small {
+    flex: 1 1 calc(50% - 1%); /* 每个小组件占据 50% 的宽度并减去间距 */
+    height: 48%; /* 保持每个小组件的高度一致，两个组件加起来与大组件相同 */
+    background-color: #00247D;
+    border-radius: 8px !important;
+    transform: translateZ(0); /* 确保3D效果正确应用 */
+    transition: transform 0.25s ease-out; /* 控制 transform 属性的过渡效果 */
+    position: relative;
+}
+
+.inner_small:hover {
+    transform: scale(1.05); /* 鼠标悬停时，放大元素 */
+}
+
+.iconBackground {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 1;
+    color: white; /* 图标颜色，可以根据需求调整 */
+}
+
+/* 新增的样式类，控制大和小图标的大小 */
+.iconLarge {
+    font-size: 800%; /* 大组件中的图标更大 */
+}
+
+.iconSmall {
+    font-size: 500%; /* 小组件中的图标保持原样 */
+}
+
+.textOverlay {
+    position: absolute;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 2;
+    padding: 5px 10px;
+    border-radius: 8px;
+    text-align: center;
+    width: 90%;
+}
+
+.text {
+    color: white !important;
+}

@@ -1,0 +1,54 @@
+.outer {
+    display: flex;
+    flex-direction: column;
+    margin-top: 2px;
+    margin-bottom: 3%;
+    height: 300px; /* 保持侧边栏的固定高度 */
+    width: 615px; /* 侧边栏的宽度 */
+    background-color: white; /* 内部填充为白色 */
+    border: 2px solid #00247D; /* 蓝色边框 */
+    border-radius: 8px; /* 边框圆角 */
+    font-size: large;
+    transform: translateZ(0); /* 确保3D效果正确应用 */
+    transition: transform 0.25s ease-out; /* 控制 transform 属性的过渡效果 */
+    position: relative;
+    margin-right: 1%;
+    overflow-y: auto; /* 允许垂直滚动 */
+}
+
+.inner {
+    flex: 1;
+    height: 100%;
+    padding: 10px;
+    overflow-y: auto; /* 允许滚动，以便在项目过多时可以滚动查看 */
+}
+
+.item {
+    display: flex; /* 使用flex布局，将子项水平排列 */
+    justify-content: space-between; /* 在父容器中均匀分布每个子项 */
+    align-items: center; /* 垂直居中子项 */
+    background-color: #f0f0f0;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    padding: 10px;
+    margin-bottom: 10px; /* 项目之间的间距 */
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.item:hover {
+    background-color: #e6f7ff; /* 鼠标悬停时更改背景色 */
+}
+
+.networkName {
+    font-weight: bold;
+    color: #00247D; /* 网络名称的颜色 */
+    flex: 1; /* 使用flex 1来自动调整宽度 */
+}
+
+.networkDetail {
+    font-size: 14px;
+    color: #333; /* 网络详情的颜色 */
+    flex: 1; /* 使用flex 1来自动调整宽度 */
+    text-align: center; /* 居中对齐 */
+}
