@@ -1,11 +1,18 @@
 
 .app-header {
   background-color: #00247D !important;
+
+}
+
+.header-container {
   height: 140px;
-  width: 100%;
+  width: 1500px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-right: 1%;
   display: grid;
   grid-template-columns: 30% 35% 35%;
-  align-items: flex-start; 
+  align-items: flex-start;
 }
 
   .logo-header {
@@ -20,21 +27,24 @@
     height: 140px; /* 以视口宽度为基准调整整体大小 */
     width: 205px; 
     margin-top: -20px;
+    display: inline-block;
   }
 
   .shield-logo {
     position: absolute;
-    top: 0;
-    left: 0;
     height: 100%; /* 根据容器的大小自动调整 */
+    width: 100%;
     transform: scale(1); /* 保持原始比例 */
   }
 
   .star-logo {
     position: absolute;
+    height: 100%;
+    width: 100%;
   }
 
   .star1, .star2, .star3, .star4 {
+    position: absolute;
     animation: star-appear 4s infinite;
     opacity: 0;
   }

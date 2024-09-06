@@ -3,7 +3,9 @@
     margin-top: 2px;
     margin-bottom: 3%;
     height: 300px; /* 保持卡片的固定高度 */
-    width: 1230px;
+    width: auto;
+    padding-left: 1%;
+    padding-right: 3%;
     font-family: 'Josefin Sans', sans-serif;
 }
 

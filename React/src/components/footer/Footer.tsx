@@ -8,7 +8,7 @@ export const Footer: React.FC = () => {
             level={3}
             style={{
               textAlign: "center",
-              height: "5px",
+              height: "3px",
               display: "flex",
               alignItems: "center", // 垂直居中
               justifyContent: "center", // 水平居中

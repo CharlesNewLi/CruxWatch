@@ -11,6 +11,7 @@ interface PropsType {
   title: string;     // 标题
   icon: string;      // 图标名称
   isLarge?: boolean; // 是否为大组件，默认为 false
+  link: string;      // 路由路径
 }
 
 // 根据传入的 icon 名称，选择相应的图标组件
@@ -31,12 +32,12 @@ const getIconComponent = (icon: string, className: string) => {
   }
 };
 
-export const ProfileImage: React.FC<PropsType> = ({ title, icon, isLarge = false }) => {
+export const ProfileImage: React.FC<PropsType> = ({ title, icon, isLarge = false, link }) => {
   // 使用不同的图标大小样式类
   const iconClassName = isLarge ? styles.iconLarge : styles.iconSmall;
   
   return (
-    <Link to={`/modules`} className={styles.profileImageContainer}>
+    <Link to={link} className={styles.profileImageContainer}> {/* 使用 link 进行跳转 */}
       <div className={styles.iconBackground}>
         {getIconComponent(icon, iconClassName)} {/* 使用选择的图标组件 */}
       </div>

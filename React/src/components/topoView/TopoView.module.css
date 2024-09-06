@@ -1,0 +1,14 @@
+.topology {
+    background-color: #f5f5f5;
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid #d9d9d9;
+  }
+  
+  .topologyPlaceholder {
+    background-color: #ffffff;
+    border: 1px dashed #d9d9d9;
+    padding: 50px;
+    text-align: center;
+    margin-top: 20px;
+  }

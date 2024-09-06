@@ -1,10 +1,10 @@
   .mapContainer {
     position: relative;
-    padding-left: 1%;
+    padding-right: 6%;
   }
 
   .map {
-    width: 100%;
+    width: auto;
     height: 300px; /* 可以根据需要调整地图的高度 */
     border-radius: 8px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
