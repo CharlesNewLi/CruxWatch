@@ -1,4 +1,5 @@
 from flask import Flask
+from config import config
 from network_mgmt import *
 # from conf_mgmt import conf_mgmt_bp
 # from perf_mont import perf_mont_bp
@@ -7,6 +8,7 @@ from network_mgmt import *
 
 app = Flask(__name__)
 
+app.config.from_object(config['development'])
 app.register_blueprint(network_mgmt_bp, url_prefix='/network')
 
 '''
