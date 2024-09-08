@@ -2,22 +2,23 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Network Device Manager</title>
+    <title>Network Elements Manager</title>
 </head>
 <body>
-    <h1>Network Device Manager</h1>
+    <h1>Network Elements Manager</h1>
 
     <!-- SSH Credentials Form -->
     <div id="ssh-credentials">
-        <h2>Add Gateway Device (SSH)</h2>
-        <form id="add-device-form">
-            <input type="text" id="device-type" placeholder="Device Type" required>
-            <input type="text" id="device-name" placeholder="Device Name" required>
+        <h2>Add GNE (SSH)</h2>
+        <form id="add-ne-form">
+            <input type="text" id="network-name" placeholder="Network Name" required>
+            <input type="text" id="ne-make" placeholder="NE Make" required>
+            <input type="text" id="ne-name" placeholder="NE Name" required>
             <input type="text" id="ssh-ip" placeholder="SSH IP Address" required>
             <input type="text" id="ssh-username" placeholder="SSH Username" required>
             <input type="password" id="ssh-password" placeholder="SSH Password" required>
             <input type="text" id="ssh-secret" placeholder="SSH Secret (Optional)">
-            <button type="submit">Add Gateway Device</button>
+            <button type="submit">Add GNE</button>
         </form>
     </div>
     
@@ -31,44 +32,48 @@
             <input type="password" id="snmp-auth-password" placeholder="SNMP Auth Password" required>
             <input type="text" id="snmp-priv-protocol" placeholder="SNMP Priv Protocol (AES128/DES)" required>
             <input type="password" id="snmp-priv-password" placeholder="SNMP Priv Password" required>
-            <input type="hidden" id="snmp-device-name">
+            <input type="hidden" id="snmp-ne-name">
+            <input type="hidden" id="snmp-network-name">
             <button type="submit">Submit</button>
             <button type="button" id="snmp-cancel">Cancel</button>
         </form>
     </div>
 
-    <h2>Devices</h2>
-    <div id="device-list">
+    <h2>Network Elements(NEs)</h2>
+    <div id="ne-list">
         <!-- Dynamically filled by JavaScript -->
     </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Add Gateway Device
-            document.getElementById('add-device-form').addEventListener('submit', function(event) {
+            // Add NE (GNE) via SSH
+            document.getElementById('add-ne-form').addEventListener('submit', function(event) {
                 event.preventDefault();
                 
-                const deviceData = {
-                    name: document.getElementById('device-name').value,
+                const neData = {
+                    ne_name: document.getElementById('ne-name').value,
                     ssh_ip: document.getElementById('ssh-ip').value,
-                    device_type: document.getElementById('device-type').value,
+                    ne_make: document.getElementById('ne-make').value,
                     ssh_username: document.getElementById('ssh-username').value,
                     ssh_password: document.getElementById('ssh-password').value,
                     ssh_secret: document.getElementById('ssh-secret').value
                 };
+
+                const networkName = document.getElementById('network-name').value;
                 
-                fetch('/devices/add', {
+                // Use network_name in the URL
+                fetch(`/${networkName}/elements/add`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify(deviceData),
+                    body: JSON.stringify(neData),
                 })
                 .then(response => response.json())
                 .then(data => {
                     if (data.status === 'success') {
                         alert(data.message);
-                        updateDeviceList(data.devices);
+                        updateNEList(data.devices);
                     } else {
                         alert(data.error);
                     }
@@ -76,28 +81,28 @@
                 .catch(error => console.error('Error:', error));
             });
 
-            // Function to update the device list
-            function updateDeviceList(devices) {
-                console.log(devices); // 调试输出，检查 devices 数据是否正确
-                const deviceListDiv = document.getElementById('device-list');
-                deviceListDiv.innerHTML = '';
+            // Function to update the NE list
+            function updateNEList(nes) {
+                console.log(nes); // 调试输出，检查 NEs 数据是否正确
+                const neListDiv = document.getElementById('ne-list');
+                neListDiv.innerHTML = '';
 
-                devices.forEach(device => {
-                    const deviceDiv = document.createElement('div');
-                    deviceDiv.classList.add('device');
-                    deviceDiv.setAttribute('data-device-name', device.name);
+                nes.forEach(ne => {
+                    const neDiv = document.createElement('div');
+                    neDiv.classList.add('ne');
+                    neDiv.setAttribute('data-ne-name', ne.ne_name);
 
-                    const deviceName = document.createElement('h3');
-                    deviceName.textContent = device.name;
+                    const neName = document.createElement('h3');
+                    neName.textContent = ne.ne_name;
 
-                    const deviceIp = document.createElement('p');
-                    deviceIp.textContent = `IP Address: ${device.ssh_ip}`;
+                    const neIp = document.createElement('p');
+                    neIp.textContent = `IP Address: ${ne.ssh_ip}`;
 
                     const getConfigButton = document.createElement('button');
                     getConfigButton.classList.add('get-config');
                     getConfigButton.textContent = 'Get Config (SSH)';
                     getConfigButton.addEventListener('click', function() {
-                        const url = `/device/${device.name}/Config`;
+                        const url = `/${ne.network_name}/${ne.ne_name}/Config`;
                         window.open(url, '_blank');
                     });
 
@@ -106,20 +111,21 @@
                     setSnmpButton.textContent = 'Set SNMP';
                     setSnmpButton.addEventListener('click', function() {
                         document.getElementById('snmp-modal').style.display = 'block';
-                        document.getElementById('snmp-device-name').value = device.name;
+                        document.getElementById('snmp-ne-name').value = ne.ne_name;
+                        document.getElementById('snmp-network-name').value = ne.network_name;
                     });
 
-                    deviceDiv.appendChild(deviceName);
-                    deviceDiv.appendChild(deviceIp);
-                    deviceDiv.appendChild(getConfigButton);
-                    deviceDiv.appendChild(setSnmpButton);
+                    neDiv.appendChild(neName);
+                    neDiv.appendChild(neIp);
+                    neDiv.appendChild(getConfigButton);
+                    neDiv.appendChild(setSnmpButton);
 
-                    if (device.snmp_username) {
+                    if (ne.snmp_username) {
                         const getInfoButton = document.createElement('button');
                         getInfoButton.classList.add('get-info');
                         getInfoButton.textContent = 'Get Info (SNMP)';
                         getInfoButton.addEventListener('click', function() {
-                            const url = `/device/${device.name}/Info`;
+                            const url = `/${ne.network_name}/${ne.ne_name}/Info`;
                             window.open(url, '_blank');
                         });
 
@@ -127,20 +133,21 @@
                         discoverNeighborButton.classList.add('discover-neighbor');
                         discoverNeighborButton.textContent = 'Discover Neighbor';
                         discoverNeighborButton.addEventListener('click', function() {
-                            const deviceName = device.name;
+                            const neName = ne.ne_name;
+                            const networkName = ne.network_name;
                             
-                            fetch('/devices/discover', {
+                            fetch(`/${networkName}/elements/discover`, {
                                 method: 'POST',
                                 headers: {
-                                    'Content-Type': 'application/json',  // 添加这行确保 Content-Type 被正确设置
+                                    'Content-Type': 'application/json',
                                 },
-                                body: JSON.stringify({ device_name: deviceName }),  // 传递 JSON 数据
+                                body: JSON.stringify({ ne_name: neName }),
                             })
                             .then(response => response.json())
                             .then(data => {
                                 if (data.status === 'success') {
                                     alert('Discovered Neighbors: ' + data.neighbors.join(', '));
-                                    updateDeviceList(data.devices);
+                                    updateNEList(data.nes);
                                 } else {
                                     alert('Failed to discover neighbors.');
                                 }
@@ -148,18 +155,18 @@
                             .catch(error => console.error('Error:', error));
                         });
 
-                        deviceDiv.appendChild(getInfoButton);
-                        deviceDiv.appendChild(discoverNeighborButton);
+                        neDiv.appendChild(getInfoButton);
+                        neDiv.appendChild(discoverNeighborButton);
                     }
 
-                    deviceListDiv.appendChild(deviceDiv);
+                    neListDiv.appendChild(neDiv);
                 });
             }
 
-            // Handle form submission
+            // Handle SNMP form submission
             document.getElementById('snmp-form').addEventListener('submit', function(event) {
                 event.preventDefault();
-                
+
                 const snmpData = {
                     snmp_ip: document.getElementById('snmp-ip').value,
                     snmp_username: document.getElementById('snmp-username').value,
@@ -167,10 +174,12 @@
                     snmp_auth_password: document.getElementById('snmp-auth-password').value,
                     snmp_priv_protocol: document.getElementById('snmp-priv-protocol').value,
                     snmp_priv_password: document.getElementById('snmp-priv-password').value,
-                    device_name: document.getElementById('snmp-device-name').value
+                    ne_name: document.getElementById('snmp-ne-name').value
                 };
 
-                fetch('/devices/set_snmp', {
+                const networkName = document.getElementById('snmp-network-name').value;
+
+                fetch(`/${networkName}/${ne.ne_name}/set_snmp`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -181,7 +190,7 @@
                 .then(data => {
                     if (data.status === 'success') {
                         alert('SNMP setup successful.');
-                        updateDeviceList(data.devices);
+                        updateNEList(data.nes);
                         document.getElementById('snmp-modal').style.display = 'none';
                     } else {
                         alert(data.error);

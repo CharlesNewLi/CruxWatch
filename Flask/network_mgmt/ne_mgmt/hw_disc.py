@@ -1,13 +1,8 @@
-from flask import Flask, render_template, jsonify, request
-from netmiko import ConnectHandler
 import logging
 import socket
+from netmiko import ConnectHandler
 from pysnmp.hlapi import *
 from cachetools import cached, TTLCache
-from . import network_mgmt_bp
-
-# Enable debug logging
-logging.basicConfig(level=logging.DEBUG)
 
 # Cache configuration: max size of 100, TTL (time-to-live) of 300 seconds (5 minutes)
 cache = TTLCache(maxsize=100, ttl=300)
@@ -37,24 +32,16 @@ def filter_ssh_params(device_info):
     
     return ssh_params
 
-# Filter out SNMP-related parameters from the device info
-def filter_snmp_params(device_info):
-    allowed_keys = ['ip', 'username', 'auth_protocol', 'auth_password', 'priv_protocol', 'priv_password']
-    return {key.replace('snmp_', ''): value for key, value in device_info.items() if key.startswith('snmp_') and key.replace('snmp_', '') in allowed_keys}
-
 # Fetch SNMP data
 @cached(cache, key=lambda device: device['snmp_ip'])
 def get_snmpv3_data(device):
     snmp_params = filter_snmp_params(device)
-    logging.debug(f"SNMP parameters: {snmp_params}")
-
     auth_protocol = usmHMACSHAAuthProtocol if snmp_params.get('auth_protocol') == 'SHA' else usmHMACMD5AuthProtocol
     priv_protocol = usmAesCfb128Protocol if snmp_params.get('priv_protocol') == 'AES128' else usmDESPrivProtocol
     
     data = {}
 
     def fetch_oid(oid, label):
-        logging.debug(f"Fetching OID {oid} for device {device['name']}")
         iterator = getCmd(
             SnmpEngine(),
             UsmUserData(snmp_params['username'], snmp_params['auth_password'], snmp_params['priv_password'],
@@ -66,10 +53,8 @@ def get_snmpv3_data(device):
         )
         errorIndication, errorStatus, errorIndex, varBinds = next(iterator)
         if errorIndication:
-            logging.error(f"Error indication: {errorIndication}")
             data[label] = str(errorIndication)
         elif errorStatus:
-            logging.error(f"Error status: {errorStatus.prettyPrint()}")
             data[label] = f'{errorStatus.prettyPrint()} at {errorIndex and varBinds[int(errorIndex)-1][0] or "?"}'
         else:
             data[label] = str(varBinds[0][1])
@@ -81,6 +66,11 @@ def get_snmpv3_data(device):
     fetch_oid('1.3.6.1.2.1.2.1.0', 'Number of Interfaces')  # ifNumber
 
     return data
+
+# Filter out SNMP-related parameters from the device info
+def filter_snmp_params(device_info):
+    allowed_keys = ['ip', 'username', 'auth_protocol', 'auth_password', 'priv_protocol', 'priv_password']
+    return {key.replace('snmp_', ''): value for key, value in device_info.items() if key.startswith('snmp_') and key.replace('snmp_', '') in allowed_keys}
 
 # Discover neighboring devices via SNMP
 def discover_neighbors(device):
@@ -149,14 +139,6 @@ def discover_neighbors(device):
     
     return neighbors
 
-# Log connection attempts
-def log_connection_attempt(device):
-    logging.debug(f"Connecting to device {device['name']} at IP: {device['ssh_ip']}")
-
-# Log command execution
-def log_command_execution(command, device):
-    logging.debug(f"Executing command: {command} on device {device['name']} at IP: {device['ssh_ip']}")
-
 # Query device via GNE as a gateway
 def query_device_via_gateway(gne_device, target_device, command):
     try:
@@ -219,138 +201,10 @@ def query_device_via_gateway(gne_device, target_device, command):
         logging.error(f"Error during SSH connection: {str(e)}")
         return {'status': 'failure', 'error': str(e)}
 
-@network_mgmt_bp.route('/')
-def home():
-    return render_template('index.html')
+# Log connection attempts
+def log_connection_attempt(device):
+    logging.debug(f"Connecting to device {device['name']} at IP: {device['ssh_ip']}")
 
-@network_mgmt_bp.route('/devices')
-def devices_page():
-    return render_template('devices.html', devices=devices)
-
-@network_mgmt_bp.route('/devices/add', methods=['POST'])
-def add_device():
-    data = request.json
-
-    # Generate device name and dynamic dictionary name
-    device_name = data['name']
-    gne_device = {
-        'device_type': data['device_type'],
-        'name': device_name,
-        'ssh_ip': data['ssh_ip'],
-        'ssh_username': data['ssh_username'],
-        'ssh_password': data['ssh_password'],
-        'ssh_secret': data.get('ssh_secret', ''),
-        'session_log': f'session_log_{device_name}.txt',
-        'verbose': True,
-        'global_delay_factor': 2,
-        'gne': data['ssh_ip']  # For GNE devices, gne points to its own ssh_ip
-    }
-
-    if is_valid_ip(gne_device['ssh_ip']):
-        try:
-            # Attempt to establish SSH connection via Netmiko
-            connection = ConnectHandler(**filter_ssh_params(gne_device))
-            connection.disconnect()
-            devices[device_name] = gne_device
-            logging.debug(f"Current devices in dictionary after adding device: {list(devices.keys())}")
-            return jsonify({'status': 'success', 'message': f'Device {device_name} added successfully.', 'devices': list(devices.values())}), 201
-        except Exception as e:
-            return jsonify({'status': 'failure', 'error': f'SSH connection failed: {str(e)}'}), 500
-    else:
-        return jsonify({'status': 'failure', 'error': 'Invalid IP address.'}), 400
-
-@network_mgmt_bp.route('/devices/set_snmp', methods=['POST'])
-def set_snmp():
-    data = request.json
-    device_name = data.get('device_name')
-
-    logging.debug(f"Received SNMP setup data: {data}")
-
-    device = devices.get(device_name)
-    
-    if device:
-        device.update({
-            'snmp_ip': data['snmp_ip'],
-            'snmp_username': data['snmp_username'],
-            'snmp_auth_protocol': data['snmp_auth_protocol'],
-            'snmp_auth_password': data['snmp_auth_password'],
-            'snmp_priv_protocol': data['snmp_priv_protocol'],
-            'snmp_priv_password': data['snmp_priv_password'],
-        })
-
-        try:
-            snmp_data = get_snmpv3_data(device)
-            logging.debug(f"SNMP setup successful, retrieved data: {snmp_data}")
-            
-            device['snmp_setup_success'] = True  # Mark SNMP setup success
-            
-            return jsonify({'status': 'success', 'message': 'SNMP setup successful.', 'snmp_data': snmp_data, 'devices': list(devices.values())}), 200
-        except Exception as e:
-            logging.error(f"SNMP setup failed: {str(e)}")
-            return jsonify({'status': 'failure', 'error': f'SNMP setup failed: {str(e)}'}), 500
-    else:
-        logging.error("Device not found.")
-        return jsonify({'status': 'failure', 'error': 'Device not found.'}), 404
-
-@network_mgmt_bp.route('/devices/discover', methods=['POST'])
-def discover():
-    device_name = request.json.get('device_name')
-    device = devices.get(device_name)
-    if device:
-        neighbors = discover_neighbors(device)
-        logging.debug(f"Current devices in dictionary after discovering neighbors in /discover: {list(devices.keys())}")
-        return jsonify({'status': 'success', 'neighbors': neighbors, 'devices': list(devices.values())}), 200
-    else:
-        return jsonify({'status': 'failure', 'error': f'Device {device_name} not found'}), 404
-
-@network_mgmt_bp.route('/device/<device_name>/Config', methods=['GET'])
-def get_config(device_name):
-    device = devices.get(device_name.strip())
-    
-    if not device:
-        return jsonify({'error': f'Device {device_name} not found'}), 404
-
-    logging.debug(f"Devices dictionary content: {devices}")
-
-    command = 'display current-configuration'
-    
-    if device['ssh_ip'] == device.get('gne'):
-        gne_device = device
-    else:
-        gne_ip = device.get('gne')
-        logging.debug(f"Attempting to find GNE device with IP: {gne_ip}")
-
-        gne_device_name = None
-        for name, dev in devices.items():
-            if dev['ssh_ip'] == gne_ip:
-                gne_device_name = name
-                break
-
-        if not gne_device_name:
-            logging.error(f"GNE device not found in devices dictionary for IP: {gne_ip}")
-            return jsonify({'error': 'GNE device not found for the target device'}), 404
-        else:
-            gne_device = devices[gne_device_name]
-    
-    result = query_device_via_gateway(gne_device, device, command)
-    
-    if result['status'] == 'success':
-        return render_template('configure.html', device_name=device_name, result=result['output'])
-    else:
-        return render_template('configure.html', device_name=device_name, result=result['error'])
-
-@network_mgmt_bp.route('/device/<device_name>/Info', methods=['GET'])
-def get_info(device_name):
-    device = devices.get(device_name)
-
-    if not device:
-        return jsonify({'error': f'Device {device_name} not found'}), 404
-
-    if 'snmp_ip' in device:
-        try:
-            data = get_snmpv3_data(device)
-            return render_template('info.html', device_name=device_name, data=data)
-        except Exception as e:
-            return render_template('info.html', device_name=device_name, error=str(e))
-    else:
-        return render_template('info.html', device_name=device_name, error=f'SNMP not configured for device {device_name}')
+# Log command execution
+def log_command_execution(command, device):
+    logging.debug(f"Executing command: {command} on device {device['name']} at IP: {device['ssh_ip']}")

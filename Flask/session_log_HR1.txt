@@ -1,0 +1,13 @@
+
+Warning: The initial password poses security risks.
+The password needs to be changed. Change now? [Y/N]:N
+
+Info: The max number of VTY users is 5, the number of current VTY users online is 1, and total number of terminal users online is 2.
+      The current login time is 2024-09-09 00:17:38.
+      The last login time is 2024-09-09 00:00:32 from 192.168.31.19 through SSH.
+<HR1>
+<HR1>
+<HR1>screen-length 0 temporary
+Info: The configuration takes effect on the current user terminal interface only.
+<HR1>
+<HR1>quit
