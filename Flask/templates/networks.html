@@ -77,6 +77,7 @@
             });
 
             // 获取所有网络并显示在页面
+            // 获取所有网络并显示在页面
             function getAllNetworks() {
                 fetch('/networks/data')
                 .then(response => response.json())
@@ -89,46 +90,81 @@
                         networkDiv.classList.add('network');
 
                         const networkName = document.createElement('h3');
-                        networkName.textContent = network.title;
+                        networkName.textContent = network.network_name;
 
                         const sitesList = document.createElement('ul');
                         network.children.forEach(site => {
                             const siteItem = document.createElement('li');
-                            siteItem.textContent = site.title;
+                            siteItem.textContent = site.site_name;
 
                             // 删除站点按钮
                             const deleteSiteButton = document.createElement('button');
                             deleteSiteButton.textContent = 'Delete Site';
                             deleteSiteButton.addEventListener('click', function() {
-                                deleteSite(network.title, site.title);
+                                deleteSite(network.network_name, site.site_name);
                             });
 
                             siteItem.appendChild(deleteSiteButton);
                             sitesList.appendChild(siteItem);
                         });
 
+                        // "Add Site" 按钮
+                        const addSiteButton = document.createElement('button');
+                        addSiteButton.textContent = 'Add Site';
+                        addSiteButton.addEventListener('click', function() {
+                            const siteName = prompt('Enter the site name:');
+                            if (siteName) {
+                                addSiteToNetwork(network.network_name, siteName);
+                            }
+                        });
+
                         // 删除网络按钮
                         const deleteNetworkButton = document.createElement('button');
                         deleteNetworkButton.textContent = 'Delete Network';
                         deleteNetworkButton.addEventListener('click', function() {
-                            deleteNetwork(network.title);
+                            deleteNetwork(network.network_name);
                         });
 
                         // 管理网元按钮
                         const manageNetworkButton = document.createElement('button');
                         manageNetworkButton.textContent = 'Manage Network Elements';
                         manageNetworkButton.addEventListener('click', function() {
-                            window.location.href = `/networks/${encodeURIComponent(network.title)}/elements`; // 跳转到网元管理页面
+                            window.location.href = `/networks/${encodeURIComponent(network.network_name)}/elements`; // 跳转到网元管理页面
                         });
 
                         networkDiv.appendChild(networkName);
                         networkDiv.appendChild(sitesList);
+                        networkDiv.appendChild(addSiteButton);  // 添加 "Add Site" 按钮
                         networkDiv.appendChild(deleteNetworkButton);  // 添加删除网络按钮
                         networkDiv.appendChild(manageNetworkButton);  // 添加管理网元按钮
                         networkListDiv.appendChild(networkDiv);
                     });
                 })
                 .catch(error => console.error('Error:', error));
+            }
+
+            // 添加站点到网络
+            function addSiteToNetwork(networkName, siteName) {
+                const data = { site_name: siteName };
+
+                fetch(`/networks/${encodeURIComponent(networkName)}/add_site`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data),
+                })
+                .then(response => response.json())
+                .then(data => {
+                    alert(data.message);
+                    if (data.status === 'success') {
+                        getAllNetworks();  // 重新加载网络列表
+                    }
+                })
+                .catch(error => {
+                    console.error('Error adding site to network:', error);
+                    alert('Failed to add site.');
+                });
             }
 
             // 删除站点

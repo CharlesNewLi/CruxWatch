@@ -28,7 +28,14 @@ def create_network_route():
 
         # 创建新的网络，传递多个站点名称
         network_id = create_network(network_name, site_names)
-        return jsonify({'status': 'success', 'message': 'Network created successfully.', 'network_id': str(network_id)}), 201
+        
+        # 返回 `network_name` 和 `network_id`
+        return jsonify({
+            'status': 'success', 
+            'message': 'Network created successfully.', 
+            'network_id': str(network_id),
+            'network_name': network_name  # 返回网络名称
+        }), 201
     except Exception as e:
         print(f"Error creating network: {e}")
         return jsonify({'status': 'failure', 'message': 'Error creating network.'}), 500
@@ -44,8 +51,12 @@ def render_networks_page():
 def get_networks_data():
     networks = get_all_networks()
     networks = convert_objectid_to_str(networks)
-    print(f"Retrieved networks from database: {networks}")
-    return jsonify(networks), 200
+    
+    # 确保返回的每个网络都包含 `network_name`
+    networks_with_name = [{'network_name': network['network_name'], **network} for network in networks]
+    
+    print(f"Retrieved networks from database: {networks_with_name}")
+    return jsonify(networks_with_name), 200
 
 # 在特定网络中添加站点，确保站点名称唯一
 @network_mgmt_bp.route('/<network_name>/add_site', methods=['POST'])
@@ -53,19 +64,26 @@ def add_site_to_network_route(network_name):
     data = request.json
     site_name = data['site_name']
 
-    # 检查网络是否存在
-    network = get_network_by_name(network_name)
-    if not network:
-        return jsonify({'status': 'failure', 'message': 'Network not found.'}), 404
+    try:
+        # 检查网络是否存在
+        network = get_network_by_name(network_name)
+        if not network:
+            return jsonify({'status': 'failure', 'message': 'Network not found.'}), 404
 
-    # 检查站点名称是否已存在于该网络
-    for site in network['children']:  # 假设 'children' 是站点的列表
-        if site['title'] == site_name:
-            return jsonify({'status': 'failure', 'message': 'Site with this name already exists in the network.'}), 400
+        # 检查站点名称是否已存在于该网络
+        for site in network['children']:  # 假设 'children' 是站点的列表
+            if site['site_name'] == site_name:
+                return jsonify({'status': 'failure', 'message': 'Site with this name already exists in the network.'}), 400
 
-    # 添加站点到网络
-    result = add_site_to_network(network_name, site_name)
-    return jsonify({'status': 'success', 'message': 'Site added successfully.'}), 201
+        # 添加站点到网络
+        result = add_site_to_network(network_name, site_name)
+        if result:
+            return jsonify({'status': 'success', 'message': 'Site added successfully.', 'network_name': network_name}), 201
+        else:
+            return jsonify({'status': 'failure', 'message': 'Failed to add site to network.'}), 500
+    except Exception as e:
+        print(f"Error adding site to network {network_name}: {e}")
+        return jsonify({'status': 'failure', 'message': 'Error adding site to network.'}), 500
 
 # 删除特定网络中的站点
 @network_mgmt_bp.route('/<network_name>/<site_name>/delete_site', methods=['POST'])
@@ -84,7 +102,7 @@ def delete_site_from_network_route(network_name, site_name):
     result = delete_site_from_network(network_name, site_name)
     if result:
         print(f"Site '{site_name}' in network '{network_name}' deleted successfully.")
-        return jsonify({'status': 'success', 'message': 'Site deleted successfully.'}), 200
+        return jsonify({'status': 'success', 'message': 'Site deleted successfully.', 'network_name': network_name}), 200
     else:
         print(f"Failed to delete site '{site_name}' in network '{network_name}'.")
         return jsonify({'status': 'failure', 'message': 'Failed to delete site.'}), 500
@@ -103,7 +121,7 @@ def update_network_name_route(network_name):
     # 更新网络名称
     result = update_network_name(network_name, new_name)
     if result:
-        return jsonify({'status': 'success', 'message': 'Network name updated successfully.'}), 200
+        return jsonify({'status': 'success', 'message': 'Network name updated successfully.', 'network_name': new_name}), 200
     else:
         return jsonify({'status': 'failure', 'message': 'Failed to update network name.'}), 500
 
@@ -120,13 +138,13 @@ def update_site_name_route(network_name, site_name):
 
        # 检查新站点名称是否已存在于该网络
     for site in network['children']:
-        if site['title'] == new_name:
+        if site['site_name'] == new_name:
             return jsonify({'status': 'failure', 'message': 'Site with this name already exists in the network.'}), 400
 
     # 更新站点名称
     result = update_site_name(network_name, site_name, new_name)
     if result:
-        return jsonify({'status': 'success', 'message': 'Site name updated successfully.'}), 200
+        return jsonify({'status': 'success', 'message': 'Site name updated successfully.', 'network_name': network_name}), 200
     else:
         return jsonify({'status': 'failure', 'message': 'Failed to update site name.'}), 500
 
@@ -136,6 +154,7 @@ def discover_nes(network_name):
     data = request.json
     site_name = data['site_name']
 
+    # 检查网络是否存在
     network = get_network_by_name(network_name)
     if not network:
         return jsonify({'status': 'failure', 'error': 'Network not found.'}), 404
@@ -148,18 +167,32 @@ def discover_nes(network_name):
         add_device(neighbor)  # 调用网元管理中的函数，进行设备的具体管理操作
 
     # 将设备信息更新到网络结构中
-    network['children'][0]['NEs'].extend(neighbors)
+    for site in network['children']:
+        if site['site_name'] == site_name:
+            site['NEs'].extend(neighbors)
+            break
 
-    return jsonify({'status': 'success', 'NEs': neighbors}), 200
+    # 更新数据库中的网络结构
+    update_result = update_site_name(network_name, site_name, site_name)  # 假设这也会更新设备
+    if update_result:
+        return jsonify({'status': 'success', 'NEs': neighbors, 'network_name': network_name}), 200
+    else:
+        return jsonify({'status': 'failure', 'error': 'Failed to update network with discovered devices.'}), 500
 
 # 删除网络
 @network_mgmt_bp.route('/delete', methods=['POST'])
 def delete_network_route():
     data = request.json
     network_name = data['network_name']
-    delete_network(network_name)
-    return jsonify({'status': 'success', 'message': 'Network deleted successfully.'}), 200
 
+    # 删除指定的网络
+    delete_result = delete_network(network_name)
+    if delete_result:
+        return jsonify({'status': 'success', 'message': 'Network deleted successfully.', 'network_name': network_name}), 200
+    else:
+        return jsonify({'status': 'failure', 'message': 'Failed to delete network.'}), 500
+
+# 显示网络中的网元元素页面
 @network_mgmt_bp.route('/<network_name>/elements', methods=['GET'])
 def network_elements_page(network_name):
     return render_template('elements.html', network_name=network_name)

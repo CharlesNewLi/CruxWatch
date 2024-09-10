@@ -12,6 +12,8 @@
         <h2>Add GNE (SSH)</h2>
         <form id="add-ne-form">
             <input type="text" id="network-name" placeholder="Network Name" required>
+            <!-- Site 输入框，是否输入为可选 -->
+            <input type="text" id="site-name" placeholder="Site (Optional)">
             <input type="text" id="ne-make" placeholder="NE Make" required>
             <input type="text" id="ne-name" placeholder="NE Name" required>
             <input type="text" id="ssh-ip" placeholder="SSH IP Address" required>
@@ -39,7 +41,7 @@
         </form>
     </div>
 
-    <h2>Network Elements(NEs)</h2>
+    <h2>Network Devices (NEs)</h2>
     <div id="ne-list">
         <!-- Dynamically filled by JavaScript -->
     </div>
@@ -56,7 +58,8 @@
                     ne_make: document.getElementById('ne-make').value,
                     ssh_username: document.getElementById('ssh-username').value,
                     ssh_password: document.getElementById('ssh-password').value,
-                    ssh_secret: document.getElementById('ssh-secret').value
+                    ssh_secret: document.getElementById('ssh-secret').value,
+                    site_name: document.getElementById('site-name').value || null // 如果为空，传入 null
                 };
 
                 const networkName = document.getElementById('network-name').value;
@@ -73,7 +76,7 @@
                 .then(data => {
                     if (data.status === 'success') {
                         alert(data.message);
-                        updateNEList(data.devices);
+                        updateNEList(data.devices);  // 改为 data.devices
                     } else {
                         alert(data.error);
                     }
@@ -82,18 +85,18 @@
             });
 
             // Function to update the NE list
-            function updateNEList(nes) {
-                console.log(nes); // 调试输出，检查 NEs 数据是否正确
+            function updateNEList(devices) {  // 参数改为 devices
+                console.log(devices);  // 调试输出
                 const neListDiv = document.getElementById('ne-list');
                 neListDiv.innerHTML = '';
 
-                nes.forEach(ne => {
+                devices.forEach(ne => {
                     const neDiv = document.createElement('div');
                     neDiv.classList.add('ne');
                     neDiv.setAttribute('data-ne-name', ne.ne_name);
 
                     const neName = document.createElement('h3');
-                    neName.textContent = ne.ne_name;
+                    neName.textContent = `NE Name: ${ne.ne_name} (Network: ${ne.network_name})`;  // 显示网元名称和所属网络
 
                     const neIp = document.createElement('p');
                     neIp.textContent = `IP Address: ${ne.ssh_ip}`;
@@ -133,21 +136,18 @@
                         discoverNeighborButton.classList.add('discover-neighbor');
                         discoverNeighborButton.textContent = 'Discover Neighbor';
                         discoverNeighborButton.addEventListener('click', function() {
-                            const neName = ne.ne_name;
-                            const networkName = ne.network_name;
-                            
-                            fetch(`/${networkName}/elements/discover`, {
+                            fetch(`/${ne.network_name}/elements/discover`, {
                                 method: 'POST',
                                 headers: {
                                     'Content-Type': 'application/json',
                                 },
-                                body: JSON.stringify({ ne_name: neName }),
+                                body: JSON.stringify({ ne_name: ne.ne_name }),
                             })
                             .then(response => response.json())
                             .then(data => {
                                 if (data.status === 'success') {
                                     alert('Discovered Neighbors: ' + data.neighbors.join(', '));
-                                    updateNEList(data.nes);
+                                    updateNEList(data.devices);  // 改为 data.devices
                                 } else {
                                     alert('Failed to discover neighbors.');
                                 }
@@ -179,7 +179,7 @@
 
                 const networkName = document.getElementById('snmp-network-name').value;
 
-                fetch(`/${networkName}/${ne.ne_name}/set_snmp`, {
+                fetch(`/${networkName}/${snmpData.ne_name}/set_snmp`, {  // 改为 snmpData.ne_name
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -190,7 +190,7 @@
                 .then(data => {
                     if (data.status === 'success') {
                         alert('SNMP setup successful.');
-                        updateNEList(data.nes);
+                        updateNEList(data.devices);  // 改为 data.devices
                         document.getElementById('snmp-modal').style.display = 'none';
                     } else {
                         alert(data.error);

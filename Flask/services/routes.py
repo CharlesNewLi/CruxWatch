@@ -2,6 +2,7 @@ from flask import Blueprint, render_template
 from network_mgmt.routes import network_mgmt_bp
 from network_mgmt.ne_mgmt.routes import ne_mgmt_bp
 
+
 # Define a base blueprint for the homepage
 base_bp = Blueprint('base_bp', __name__)
 

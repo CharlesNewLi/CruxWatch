@@ -79,7 +79,7 @@ def discover_neighbors(device):
     priv_protocol = usmAesCfb128Protocol if snmp_params.get('priv_protocol') == 'AES128' else usmDESPrivProtocol
     
     neighbors = []
-    logging.debug(f"Discovering neighbors for device {device['name']}")
+    logging.debug(f"Discovering neighbors for device {device['device_name']}")
     iterator = nextCmd(
         SnmpEngine(),
         UsmUserData(snmp_params['username'], snmp_params['auth_password'], snmp_params['priv_password'],
@@ -119,7 +119,7 @@ def discover_neighbors(device):
         ne_device_key = ne_name
         ne_device = {
             'device_type': 'huawei',
-            'name': ne_name,
+            'device_name': ne_name,
             'ssh_ip': ne_ip,
             'ssh_username': device['ssh_username'],  # Use SSH credentials from the main device
             'ssh_password': device['ssh_password'],
@@ -143,14 +143,14 @@ def discover_neighbors(device):
 def query_device_via_gateway(gne_device, target_device, command):
     try:
         # Print the GNE value for the target device
-        logging.debug(f"Target device {target_device['name']} GNE value: {target_device.get('gne')}")
+        logging.debug(f"Target device {target_device['device_name']} GNE value: {target_device.get('gne')}")
 
         # Check if the GNE device exists
         gne_ip = target_device.get('gne')
         gne_device_name = None
-        for name, device in devices.items():
+        for device_name, device in devices.items():
             if device['ssh_ip'] == gne_ip:
-                gne_device_name = name
+                gne_device_name = device_name
                 break
 
         if not gne_device_name:
@@ -203,8 +203,8 @@ def query_device_via_gateway(gne_device, target_device, command):
 
 # Log connection attempts
 def log_connection_attempt(device):
-    logging.debug(f"Connecting to device {device['name']} at IP: {device['ssh_ip']}")
+    logging.debug(f"Connecting to device {device['device_name']} at IP: {device['ssh_ip']}")
 
 # Log command execution
 def log_command_execution(command, device):
-    logging.debug(f"Executing command: {command} on device {device['name']} at IP: {device['ssh_ip']}")
+    logging.debug(f"Executing command: {command} on device {device['device_name']} at IP: {device['ssh_ip']}")
