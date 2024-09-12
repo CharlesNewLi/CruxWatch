@@ -32,8 +32,23 @@ def filter_ssh_params(device_info):
     
     return ssh_params
 
+# Filter out SNMP-related parameters from the device info
+def filter_snmp_params(device_info):
+    allowed_keys = ['ip', 'username', 'auth_protocol', 'auth_password', 'priv_protocol', 'priv_password']
+    snmp_params = {}
+
+    # 检查 allowed_keys 中的键，确保 IP 地址等关键参数不会被过滤掉
+    for key in allowed_keys:
+        if key in device_info:
+            snmp_params[key] = device_info[key]
+        snmp_key = f'snmp_{key}'
+        if snmp_key in device_info:
+            snmp_params[key] = device_info[snmp_key]
+
+    return snmp_params
+
 # Fetch SNMP data
-@cached(cache, key=lambda device: device['snmp_ip'])
+@cached(cache, key=lambda device: device['ip'])
 def get_snmpv3_data(device):
     snmp_params = filter_snmp_params(device)
     auth_protocol = usmHMACSHAAuthProtocol if snmp_params.get('auth_protocol') == 'SHA' else usmHMACMD5AuthProtocol
@@ -66,11 +81,6 @@ def get_snmpv3_data(device):
     fetch_oid('1.3.6.1.2.1.2.1.0', 'Number of Interfaces')  # ifNumber
 
     return data
-
-# Filter out SNMP-related parameters from the device info
-def filter_snmp_params(device_info):
-    allowed_keys = ['ip', 'username', 'auth_protocol', 'auth_password', 'priv_protocol', 'priv_password']
-    return {key.replace('snmp_', ''): value for key, value in device_info.items() if key.startswith('snmp_') and key.replace('snmp_', '') in allowed_keys}
 
 # Discover neighboring devices via SNMP
 def discover_neighbors(device):
@@ -120,24 +130,33 @@ def discover_neighbors(device):
         ne_device = {
             'device_type': 'huawei',
             'device_name': ne_name,
-            'ssh_ip': ne_ip,
+            'ip': ne_ip,
             'ssh_username': device['ssh_username'],  # Use SSH credentials from the main device
             'ssh_password': device['ssh_password'],
             'ssh_secret': device['ssh_secret'],
             'verbose': device['verbose'],
             'global_delay_factor': device['global_delay_factor'],
             'session_log': f'session_log_{ne_name}.txt',
-            'gne': device['ssh_ip'],  # Set GNE to the device that discovered it
+            'gne': device['ip'],  # Set GNE to the device that discovered it
+            'network_name': device['network_name']
         }
 
         # Add new neighbor device to the devices dictionary
-        if not any(d['ssh_ip'] == ne_ip for d in devices.values()):
+        if not any(d['ip'] == ne_ip for d in devices.values()):
             devices[ne_device_key] = ne_device
             neighbors.append(ne_device_key)
     
     logging.debug(f"Devices dictionary after neighbor discovery: {devices}")
     
     return neighbors
+
+# Log connection attempts
+def log_connection_attempt(device):
+    logging.debug(f"Connecting to device {device['device_name']} at IP: {device['ip']}")
+
+# Log command execution
+def log_command_execution(command, device):
+    logging.debug(f"Executing command: {command} on device {device['device_name']} at IP: {device['ip']}")
 
 # Query device via GNE as a gateway
 def query_device_via_gateway(gne_device, target_device, command):
@@ -149,7 +168,7 @@ def query_device_via_gateway(gne_device, target_device, command):
         gne_ip = target_device.get('gne')
         gne_device_name = None
         for device_name, device in devices.items():
-            if device['ssh_ip'] == gne_ip:
+            if device['ip'] == gne_ip:
                 gne_device_name = device_name
                 break
 
@@ -164,13 +183,13 @@ def query_device_via_gateway(gne_device, target_device, command):
         gne_params = filter_ssh_params(gne_device)
         target_params = filter_ssh_params(target_device)
 
-        if gne_device['ssh_ip'] != target_device['ssh_ip']:
+        if gne_device['ip'] != target_device['ip']:
             connection = ConnectHandler(**gne_params)
             if 'secret' in gne_device:
                 connection.enable()
 
             # Connect to the neighbor device via GNE
-            stelnet_command = f"stelnet {target_device['ssh_ip']}"
+            stelnet_command = f"stelnet {target_device['ip']}"
             command_output = connection.send_command_timing(stelnet_command)
 
             if 'The server is not authenticated' in command_output:
@@ -203,8 +222,8 @@ def query_device_via_gateway(gne_device, target_device, command):
 
 # Log connection attempts
 def log_connection_attempt(device):
-    logging.debug(f"Connecting to device {device['device_name']} at IP: {device['ssh_ip']}")
+    logging.debug(f"Connecting to device {device['device_name']} at IP: {device['ip']}")
 
 # Log command execution
 def log_command_execution(command, device):
-    logging.debug(f"Executing command: {command} on device {device['device_name']} at IP: {device['ssh_ip']}")
+    logging.debug(f"Executing command: {command} on device {device['device_name']} at IP: {device['ip']}")

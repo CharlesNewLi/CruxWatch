@@ -11,12 +11,11 @@
     <div id="ssh-credentials">
         <h2>Add GNE (SSH)</h2>
         <form id="add-ne-form">
-            <input type="text" id="network-name" placeholder="Network Name" required>
-            <!-- Site 输入框，是否输入为可选 -->
+            <input type="text" id="network-name" placeholder="Network Name" required readonly>
             <input type="text" id="site-name" placeholder="Site (Optional)">
             <input type="text" id="ne-make" placeholder="NE Make" required>
             <input type="text" id="ne-name" placeholder="NE Name" required>
-            <input type="text" id="ssh-ip" placeholder="SSH IP Address" required>
+            <input type="text" id="ssh-ip" placeholder="NE IP Address" required>
             <input type="text" id="ssh-username" placeholder="SSH Username" required>
             <input type="password" id="ssh-password" placeholder="SSH Password" required>
             <input type="text" id="ssh-secret" placeholder="SSH Secret (Optional)">
@@ -28,7 +27,7 @@
     <div id="snmp-modal" style="display: none;">
         <h2>Configure SNMP</h2>
         <form id="snmp-form">
-            <input type="text" id="snmp-ip" placeholder="SNMP IP Address" required>
+            <input type="text" id="snmp-ip" placeholder="NE IP Address" required>
             <input type="text" id="snmp-username" placeholder="SNMP Username" required>
             <input type="text" id="snmp-auth-protocol" placeholder="SNMP Auth Protocol (SHA/MD5)" required>
             <input type="password" id="snmp-auth-password" placeholder="SNMP Auth Password" required>
@@ -41,29 +40,34 @@
         </form>
     </div>
 
-    <h2>Network Devices (NEs)</h2>
+    <h2>Network Elements (NEs)</h2>
     <div id="ne-list">
         <!-- Dynamically filled by JavaScript -->
     </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            const localStorageKey = 'network_elements';
+
+            // 自动从 URL 提取 network_name 并填入
+            const pathParts = window.location.pathname.split('/');
+            const networkName = pathParts[2] || '';  // 假设 URL 结构为 '/<network_name>/...'
+            document.getElementById('network-name').value = networkName;
+
             // Add NE (GNE) via SSH
             document.getElementById('add-ne-form').addEventListener('submit', function(event) {
                 event.preventDefault();
                 
                 const neData = {
                     ne_name: document.getElementById('ne-name').value,
-                    ssh_ip: document.getElementById('ssh-ip').value,
+                    ne_ip: document.getElementById('ssh-ip').value,
                     ne_make: document.getElementById('ne-make').value,
                     ssh_username: document.getElementById('ssh-username').value,
                     ssh_password: document.getElementById('ssh-password').value,
                     ssh_secret: document.getElementById('ssh-secret').value,
-                    site_name: document.getElementById('site-name').value || null // 如果为空，传入 null
+                    site_name: document.getElementById('site-name').value || null
                 };
 
-                const networkName = document.getElementById('network-name').value;
-                
                 // Use network_name in the URL
                 fetch(`/${networkName}/elements/add`, {
                     method: 'POST',
@@ -76,36 +80,60 @@
                 .then(data => {
                     if (data.status === 'success') {
                         alert(data.message);
-                        updateNEList(data.devices);  // 改为 data.devices
+                        updateNEList(data.devices);
                     } else {
-                        alert(data.error);
+                        alert(data.message || 'An error occurred');
                     }
                 })
                 .catch(error => console.error('Error:', error));
             });
 
-            // Function to update the NE list
-            function updateNEList(devices) {  // 参数改为 devices
-                console.log(devices);  // 调试输出
-                const neListDiv = document.getElementById('ne-list');
-                neListDiv.innerHTML = '';
+            // Load NE List initially when the page is loaded
+            loadNEList();
 
-                devices.forEach(ne => {
+            // Function to load NE list from the server or localStorage
+            function loadNEList() {
+                const savedElements = localStorage.getItem(localStorageKey);
+                if (savedElements) {
+                    updateNEList(JSON.parse(savedElements));  // 从 localStorage 加载设备
+                } else {
+                    fetch(`/${networkName}/elements`, {
+                        method: 'GET'
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        console.log("Fetched data from server:", data);
+                        if (data.devices) {
+                            updateNEList(data.devices);
+                        }
+                    })
+                    .catch(error => console.error('Error loading NE list:', error));
+                }
+            }
+            
+            // Function to update the NE list and store it in localStorage
+            function updateNEList(devices) {
+                const neListDiv = document.getElementById('ne-list');
+                neListDiv.innerHTML = '';  // 清空当前列表
+
+                devices.forEach(device => {
+                    console.log("Processing NE element:", device); // 调试输出，确保正确获取每个网元的数据
+                    
                     const neDiv = document.createElement('div');
-                    neDiv.classList.add('ne');
-                    neDiv.setAttribute('data-ne-name', ne.ne_name);
+                    neDiv.classList.add('element');
+                    neDiv.setAttribute('data-ne-name', device.device_name);
 
                     const neName = document.createElement('h3');
-                    neName.textContent = `NE Name: ${ne.ne_name} (Network: ${ne.network_name})`;  // 显示网元名称和所属网络
+                    neName.textContent = `NE Name: ${device.device_name} (Network: ${device.network_name})`;
 
                     const neIp = document.createElement('p');
-                    neIp.textContent = `IP Address: ${ne.ssh_ip}`;
+                    neIp.textContent = `IP Address: ${device.ip}`;
 
                     const getConfigButton = document.createElement('button');
                     getConfigButton.classList.add('get-config');
                     getConfigButton.textContent = 'Get Config (SSH)';
                     getConfigButton.addEventListener('click', function() {
-                        const url = `/${ne.network_name}/${ne.ne_name}/Config`;
+                        const url = `/${networkName}/${device.device_name}/Config`;
                         window.open(url, '_blank');
                     });
 
@@ -114,8 +142,8 @@
                     setSnmpButton.textContent = 'Set SNMP';
                     setSnmpButton.addEventListener('click', function() {
                         document.getElementById('snmp-modal').style.display = 'block';
-                        document.getElementById('snmp-ne-name').value = ne.ne_name;
-                        document.getElementById('snmp-network-name').value = ne.network_name;
+                        document.getElementById('snmp-ne-name').value = device.device_name;
+                        document.getElementById('snmp-network-name').value = networkName;
                     });
 
                     neDiv.appendChild(neName);
@@ -123,12 +151,13 @@
                     neDiv.appendChild(getConfigButton);
                     neDiv.appendChild(setSnmpButton);
 
-                    if (ne.snmp_username) {
+                    // 确保当 SNMP 配置成功后，显示相关按钮
+                    if (device.snmp_username) {
                         const getInfoButton = document.createElement('button');
                         getInfoButton.classList.add('get-info');
                         getInfoButton.textContent = 'Get Info (SNMP)';
                         getInfoButton.addEventListener('click', function() {
-                            const url = `/${ne.network_name}/${ne.ne_name}/Info`;
+                            const url = `/${networkName}/${device.device_name}/Info`;
                             window.open(url, '_blank');
                         });
 
@@ -136,18 +165,18 @@
                         discoverNeighborButton.classList.add('discover-neighbor');
                         discoverNeighborButton.textContent = 'Discover Neighbor';
                         discoverNeighborButton.addEventListener('click', function() {
-                            fetch(`/${ne.network_name}/elements/discover`, {
+                            fetch(`/${networkName}/${device.device_name}/discover`, {
                                 method: 'POST',
                                 headers: {
                                     'Content-Type': 'application/json',
                                 },
-                                body: JSON.stringify({ ne_name: ne.ne_name }),
+                                body: JSON.stringify({ ne_name: device.device_name }),
                             })
                             .then(response => response.json())
                             .then(data => {
                                 if (data.status === 'success') {
                                     alert('Discovered Neighbors: ' + data.neighbors.join(', '));
-                                    updateNEList(data.devices);  // 改为 data.devices
+                                    updateNEList(data.devices);
                                 } else {
                                     alert('Failed to discover neighbors.');
                                 }
@@ -161,6 +190,9 @@
 
                     neListDiv.appendChild(neDiv);
                 });
+
+                // 将设备列表存储到 localStorage
+                localStorage.setItem(localStorageKey, JSON.stringify(devices));
             }
 
             // Handle SNMP form submission
@@ -168,7 +200,7 @@
                 event.preventDefault();
 
                 const snmpData = {
-                    snmp_ip: document.getElementById('snmp-ip').value,
+                    ne_ip: document.getElementById('snmp-ip').value,
                     snmp_username: document.getElementById('snmp-username').value,
                     snmp_auth_protocol: document.getElementById('snmp-auth-protocol').value,
                     snmp_auth_password: document.getElementById('snmp-auth-password').value,
@@ -179,7 +211,7 @@
 
                 const networkName = document.getElementById('snmp-network-name').value;
 
-                fetch(`/${networkName}/${snmpData.ne_name}/set_snmp`, {  // 改为 snmpData.ne_name
+                fetch(`/${networkName}/${snmpData.ne_name}/set_snmp`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -188,18 +220,21 @@
                 })
                 .then(response => response.json())
                 .then(data => {
+                    // 打印后端的响应数据
+                    console.log("SNMP setup response data:", data);
                     if (data.status === 'success') {
                         alert('SNMP setup successful.');
-                        updateNEList(data.devices);  // 改为 data.devices
+                        // 改为使用 data.devices 而不是 data.elements
+                        updateNEList(data.devices);  // 重新渲染网元列表
                         document.getElementById('snmp-modal').style.display = 'none';
                     } else {
-                        alert(data.error);
+                        alert(data.error || 'SNMP setup failed');
                     }
                 })
                 .catch(error => console.error('Error:', error));
             });
 
-            // Handle form cancel
+            // Handle SNMP form cancel
             document.getElementById('snmp-cancel').addEventListener('click', function() {
                 document.getElementById('snmp-modal').style.display = 'none';
             });

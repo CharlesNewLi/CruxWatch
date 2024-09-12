@@ -71,7 +71,7 @@ def add_site_to_network_route(network_name):
             return jsonify({'status': 'failure', 'message': 'Network not found.'}), 404
 
         # 检查站点名称是否已存在于该网络
-        for site in network['children']:  # 假设 'children' 是站点的列表
+        for site in network['sites']:  # 假设 'sites' 是站点的列表
             if site['site_name'] == site_name:
                 return jsonify({'status': 'failure', 'message': 'Site with this name already exists in the network.'}), 400
 
@@ -137,7 +137,7 @@ def update_site_name_route(network_name, site_name):
         return jsonify({'status': 'failure', 'message': 'Network not found.'}), 404
 
        # 检查新站点名称是否已存在于该网络
-    for site in network['children']:
+    for site in network['sites']:
         if site['site_name'] == new_name:
             return jsonify({'status': 'failure', 'message': 'Site with this name already exists in the network.'}), 400
 
@@ -167,7 +167,7 @@ def discover_nes(network_name):
         add_device(neighbor)  # 调用网元管理中的函数，进行设备的具体管理操作
 
     # 将设备信息更新到网络结构中
-    for site in network['children']:
+    for site in network['sites']:
         if site['site_name'] == site_name:
             site['NEs'].extend(neighbors)
             break

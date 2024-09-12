@@ -77,7 +77,6 @@
             });
 
             // 获取所有网络并显示在页面
-            // 获取所有网络并显示在页面
             function getAllNetworks() {
                 fetch('/networks/data')
                 .then(response => response.json())
@@ -93,7 +92,7 @@
                         networkName.textContent = network.network_name;
 
                         const sitesList = document.createElement('ul');
-                        network.children.forEach(site => {
+                        network.sites.forEach(site => {
                             const siteItem = document.createElement('li');
                             siteItem.textContent = site.site_name;
 

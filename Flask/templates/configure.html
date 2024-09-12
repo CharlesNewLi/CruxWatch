@@ -8,7 +8,7 @@
 <body>
     <h1>Configure Device - {{ device_name }}</h1>
 
-    <form action="/device/{{ device_name }}/Config" method="POST">
+    <form action="/{{network_name}}/{{ device_name }}/Config" method="POST">
         <label for="command">Enter Command:</label><br>
         <input type="text" id="command" name="command" placeholder="e.g., display current-configuration"><br>
         <button type="submit">Send Command</button>
