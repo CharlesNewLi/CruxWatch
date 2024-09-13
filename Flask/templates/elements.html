@@ -193,6 +193,35 @@
 
                 // 将设备列表存储到 localStorage
                 localStorage.setItem(localStorageKey, JSON.stringify(devices));
+
+                // 创建并插入 OK 按钮
+                const okButton = document.createElement('button');
+                okButton.textContent = 'OK';
+                okButton.id = 'ok-button';
+                okButton.addEventListener('click', function() {
+                    saveDevicesToDb();  // 点击OK按钮后触发保存动作
+                });
+                neListDiv.appendChild(okButton);
+            }
+
+            function saveDevicesToDb() {
+                const networkName = document.getElementById('network-name').value;
+                fetch(`/${networkName}/elements/save`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({})
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        alert('Devices saved to the database successfully.');
+                    } else {
+                        alert('Failed to save devices to the database: ' + data.error);
+                    }
+                })
+                .catch(error => console.error('Error:', error));
             }
 
             // Handle SNMP form submission

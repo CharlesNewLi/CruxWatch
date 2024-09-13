@@ -61,6 +61,7 @@ def get_networks_data():
 # 在特定网络中添加站点，确保站点名称唯一
 @network_mgmt_bp.route('/<network_name>/add_site', methods=['POST'])
 def add_site_to_network_route(network_name):
+    print(f"Received network_name: {network_name}")
     data = request.json
     site_name = data['site_name']
 

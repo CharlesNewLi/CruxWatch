@@ -29,7 +29,6 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // 动态添加站点输入框
             const sitesContainer = document.getElementById('sites-container');
             const addSiteButton = document.getElementById('add-site-button');
 
@@ -64,7 +63,7 @@
                 })
                 .then(response => response.json())
                 .then(data => {
-                    console.log(data);  // 打印完整的返回数据
+                    console.log(data);
                     alert(data.message);
                     if (data.status === 'success') {
                         getAllNetworks();  // 刷新网络列表
@@ -85,18 +84,20 @@
                     networkListDiv.innerHTML = '';  // 清空列表
 
                     data.forEach(network => {
+                        // 创建网络的展示区域
                         const networkDiv = document.createElement('div');
                         networkDiv.classList.add('network');
 
+                        // 显示网络名称
                         const networkName = document.createElement('h3');
                         networkName.textContent = network.network_name;
 
-                        const sitesList = document.createElement('ul');
+                        // 显示网络的站点列表
+                        const sitesList = document.createElement('ul');  // 创建站点列表
                         network.sites.forEach(site => {
                             const siteItem = document.createElement('li');
                             siteItem.textContent = site.site_name;
 
-                            // 删除站点按钮
                             const deleteSiteButton = document.createElement('button');
                             deleteSiteButton.textContent = 'Delete Site';
                             deleteSiteButton.addEventListener('click', function() {
@@ -104,10 +105,57 @@
                             });
 
                             siteItem.appendChild(deleteSiteButton);
+
+                            // 渲染该站点下的所有网元 (作为站点列表的子元素)
+                            const siteElementsList = document.createElement('ul');
+                            site.elements.forEach(element => {
+                                const elementItem = document.createElement('li');
+                                elementItem.textContent = `NE Name: ${element.ne_name}, IP: ${element.ne_ip}, Make: ${element.ne_make}`;
+
+                                const changeSiteButton = document.createElement('button');
+                                changeSiteButton.textContent = 'Change Site';
+                                changeSiteButton.addEventListener('click', function() {
+                                    const newSiteName = prompt('Enter the new site name:');
+                                    if (newSiteName) {
+                                        updateNEtoSite(network.network_name, element.ne_name, newSiteName, 'Change Site');
+                                    }
+                                });
+
+                                const removeSiteButton = document.createElement('button');
+                                removeSiteButton.textContent = 'Remove from Site';
+                                removeSiteButton.addEventListener('click', function() {
+                                    removeNEfromSite(network.network_name, element.ne_name);
+                                });
+
+                                elementItem.appendChild(changeSiteButton);
+                                elementItem.appendChild(removeSiteButton);
+                                siteElementsList.appendChild(elementItem);
+                            });
+
+                            siteItem.appendChild(siteElementsList);  // 将网元列表添加到对应站点
                             sitesList.appendChild(siteItem);
                         });
 
-                        // "Add Site" 按钮
+                        // 渲染网络根层级下的未分配网元
+                        const elementsList = document.createElement('ul');  // 创建网元列表
+                        network.elements.forEach(element => {
+                            const elementItem = document.createElement('li');
+                            elementItem.textContent = `NE Name: ${element.ne_name}, IP: ${element.ne_ip}, Make: ${element.ne_make}`;
+
+                            const joinSiteButton = document.createElement('button');
+                            joinSiteButton.textContent = 'Join Site';
+                            joinSiteButton.addEventListener('click', function() {
+                                const siteName = prompt('Enter the site name to join:');
+                                if (siteName) {
+                                    updateNEtoSite(network.network_name, element.ne_name, siteName, 'Join Site');
+                                }
+                            });
+
+                            elementItem.appendChild(joinSiteButton);
+                            elementsList.appendChild(elementItem);
+                        });
+
+                        // 添加站点按钮
                         const addSiteButton = document.createElement('button');
                         addSiteButton.textContent = 'Add Site';
                         addSiteButton.addEventListener('click', function() {
@@ -124,18 +172,23 @@
                             deleteNetwork(network.network_name);
                         });
 
-                        // 管理网元按钮
+                        // 管理网络网元按钮（新增部分）
                         const manageNetworkButton = document.createElement('button');
-                        manageNetworkButton.textContent = 'Manage Network Elements';
+                        manageNetworkButton.textContent = 'Management NE';
                         manageNetworkButton.addEventListener('click', function() {
-                            window.location.href = `/networks/${encodeURIComponent(network.network_name)}/elements`; // 跳转到网元管理页面
+                            // 跳转到 /networks/<network_name>/elements 页面
+                            window.location.href = `/networks/${encodeURIComponent(network.network_name)}/elements`;
                         });
 
+                        // 将创建的元素添加到网络展示区域
                         networkDiv.appendChild(networkName);
-                        networkDiv.appendChild(sitesList);
-                        networkDiv.appendChild(addSiteButton);  // 添加 "Add Site" 按钮
-                        networkDiv.appendChild(deleteNetworkButton);  // 添加删除网络按钮
+                        networkDiv.appendChild(sitesList);   // 添加站点列表
+                        networkDiv.appendChild(elementsList); // 添加根层级网元列表
+                        networkDiv.appendChild(addSiteButton);
+                        networkDiv.appendChild(deleteNetworkButton);
                         networkDiv.appendChild(manageNetworkButton);  // 添加管理网元按钮
+
+                        // 将网络展示区域添加到页面
                         networkListDiv.appendChild(networkDiv);
                     });
                 })
@@ -145,7 +198,6 @@
             // 添加站点到网络
             function addSiteToNetwork(networkName, siteName) {
                 const data = { site_name: siteName };
-
                 fetch(`/networks/${encodeURIComponent(networkName)}/add_site`, {
                     method: 'POST',
                     headers: {
@@ -169,27 +221,15 @@
             // 删除站点
             function deleteSite(networkName, siteName) {
                 const data = { network_name: networkName, site_name: siteName };
-
-                // 确保使用 encodeURIComponent 对 networkName 和 siteName 进行编码
-                const url = `/networks/${encodeURIComponent(networkName)}/${encodeURIComponent(siteName)}/delete_site`;
-
-                // 打印发送给后端的 URL 和请求体数据
-                console.log("Sending DELETE request to URL:", url);
-                console.log("Request body:", JSON.stringify(data));
-
-                fetch(url, {
+                fetch(`/networks/${encodeURIComponent(networkName)}/${encodeURIComponent(siteName)}/delete_site`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify(data),
                 })
-                .then(response => {
-                    console.log("Response status:", response.status);  // 打印响应状态码
-                    return response.json();
-                })
+                .then(response => response.json())
                 .then(data => {
-                    console.log("Response data:", data);  // 打印完整的返回数据
                     alert(data.message);
                     if (data.status === 'success') {
                         getAllNetworks();  // 刷新网络列表
@@ -203,11 +243,6 @@
             // 删除网络
             function deleteNetwork(networkName) {
                 const data = { network_name: networkName };
-
-                // 打印发送给后端的 URL 和请求体数据
-                console.log("Sending DELETE request for network:", networkName);
-                console.log("Request body:", JSON.stringify(data));
-
                 fetch('/networks/delete', {
                     method: 'POST',
                     headers: {
@@ -215,12 +250,8 @@
                     },
                     body: JSON.stringify(data),
                 })
-                .then(response => {
-                    console.log("Response status:", response.status);  // 打印响应状态码
-                    return response.json();
-                })
+                .then(response => response.json())
                 .then(data => {
-                    console.log("Response data:", data);  // 打印完整的返回数据
                     alert(data.message);
                     if (data.status === 'success') {
                         getAllNetworks();  // 刷新网络列表
@@ -231,7 +262,57 @@
                 });
             }
 
-            // 初次加载时获取所有网络
+            // 更新网元站点的函数，增加 actionType 参数
+            function updateNEtoSite(networkName, neName, siteName, actionType) {
+                const data = { ne_name: neName, new_site_name: siteName, action_type: actionType };
+
+                console.log(`Sending request to update NE '${neName}' to site '${siteName}' in network '${networkName}' with action '${actionType}'`);
+
+                fetch(`/${encodeURIComponent(networkName)}/elements/update_site`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data),
+                })
+                .then(response => response.json())
+                .then(data => {
+                    alert(data.message);
+                    if (data.status === 'success') {
+                        getAllNetworks();  // 确保重新加载最新数据
+                    }
+                })
+                .catch(error => {
+                    console.error('Error updating NE site:', error);
+                    alert('Failed to update NE site.');
+                });
+            }
+
+            // 移除网元的函数
+            function removeNEfromSite(networkName, neName) {
+                const data = { ne_name: neName };
+
+                fetch(`/${encodeURIComponent(networkName)}/elements/remove_ne`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data),
+                })
+                .then(response => response.json())
+                .then(data => {
+                    alert(data.message);
+                    if (data.status === 'success') {
+                        getAllNetworks();  // 重新加载网络和站点列表
+                    }
+                })
+                .catch(error => {
+                    console.error('Error removing NE from site:', error);
+                    alert('Failed to remove NE from site.');
+                });
+            }
+
+            // 初次加载时获取所有网络和网元
             getAllNetworks();
         });
     </script>

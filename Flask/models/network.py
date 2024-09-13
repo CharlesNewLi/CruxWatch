@@ -1,63 +1,61 @@
 from services.db import get_db
 from bson import ObjectId
 
-# Helper function to convert device data into database format (db_element)
+# 将设备数据转换为数据库格式
 def convert_device_to_db_format(device):
-    """
-    Convert the network device data to match the database's naming conventions.
-    Only necessary fields are kept and renamed according to the provided mapping.
-    """
-    # 定义需要转换的字段及其目标字段名称
     key_mapping = {
-        'device_name': 'ne_name',  # 将 'device_name' 转换为 'ne_name'
-        'device_type': 'ne_make',  # 将 'device_type' 转换为 'ne_make'
-        'ip': 'ne_ip',             # 将 'ip' 转换为 'ne_ip'
-        'gne': 'gne',              # 保留 GNE 信息
-        'ssh_username': 'ssh_username',  # 保留 ssh_username
-        'ssh_password': 'ssh_password',  # 保留 ssh_password
-        'ssh_secret': '',
+        'device_name': 'ne_name',
+        'device_type': 'ne_make',
+        'ip': 'ne_ip',
+        'gne': 'gne',
+        'ssh_username': 'ssh_username',
+        'ssh_password': 'ssh_password',
         'snmp_username': 'snmp_username',
         'snmp_auth_password': 'snmp_auth_password',
         'snmp_auth_protocol': 'snmp_auth_protocol',
         'snmp_priv_password': 'snmp_priv_password',
-        'snmp_priv_protocol': 'snmp_priv_protocol',       
+        'snmp_priv_protocol': 'snmp_priv_protocol',
     }
     
-    # 过滤并转换字段
-    element = {
-        'ne_id': str(ObjectId())
-    }
+    # 转换设备信息
+    element = {'ne_id': str(ObjectId())}
     for device_key, ne_key in key_mapping.items():
         if device_key in device:
             element[ne_key] = device[device_key]
 
     return element
 
-# 创建网络结构，支持多个站点，默认空的ne_names
-def create_network(network_name, site_names, ne_names=None):
+# 创建网络结构，支持多个站点，默认空的ne_names和site_location
+def create_network(network_name, site_names, ne_names=None, site_locations=None):
     db = get_db()
     networks_collection = db.get_collection('networks')
 
     # 如果 ne_names 为 None，默认设为空列表
     if ne_names is None:
-        ne_names = []    
-    
+        ne_names = []
+
+    # 如果 site_locations 为 None，默认设为空列表
+    if site_locations is None:
+        site_locations = [''] * len(site_names)
+
     # 为每个站点生成唯一的 key 并创建站点结构
     sites = []
-    for site_name in site_names:
+    for site_name, site_location in zip(site_names, site_locations):
         site = {
             "site_id": str(ObjectId()),  # 为站点生成唯一的ID
             "site_name": site_name,
+            "site_location": site_location,  # 初始化站点的地理位置字段
             "elements": []  # 初始化站点的空网络元素（NE）列表
         }
 
-        # 为每个站点添加 elements
+        # 仅当 ne_names 不为空时，才为站点添加 elements
         for ne_name in ne_names:
-            element = {
-                "ne_id": str(ObjectId()), # 为每个元素生成唯一的 
-                "ne_name": ne_name,
-            }
-            site['elements'].append(element)
+            if ne_name:  # 确保 ne_name 有效
+                element = {
+                    "ne_id": str(ObjectId()), # 为每个元素生成唯一的ID
+                    "ne_name": ne_name,
+                }
+                site['elements'].append(element)
 
         sites.append(site)
 
@@ -71,16 +69,17 @@ def create_network(network_name, site_names, ne_names=None):
 
     # 为网络根层次添加 elements
     for ne_name in ne_names:
-        element = {
-            "ne_id": str(ObjectId()),  # 为每个元素生成唯一的 key
-            "ne_name": ne_name,
-        }
-        network['elements'].append(element)
+        if ne_name:  # 确保 ne_name 有效
+            element = {
+                "ne_id": str(ObjectId()),  # 为每个元素生成唯一的 key
+                "ne_name": ne_name,
+            }
+            network['elements'].append(element)
 
     return networks_collection.insert_one(network).inserted_id
 
 # 添加站点到网络
-def add_site_to_network(network_name, site_name):
+def add_site_to_network(network_name, site_name, site_location=""):
     db = get_db()
     networks_collection = db.get_collection('networks')
 
@@ -98,8 +97,10 @@ def add_site_to_network(network_name, site_name):
     new_site = {
         "site_id": str(ObjectId()),
         "site_name": site_name,
+        "site_location": site_location,  # 初始化站点的地理位置字段
         "elements": []  # 初始化站点的空网络元素（NE）列表
     }
+
     network['sites'].append(new_site)
 
     # 更新网络信息
@@ -108,36 +109,76 @@ def add_site_to_network(network_name, site_name):
     if result.modified_count > 0:
         return {'status': 'success', 'message': f'Site {site_name} added successfully to network {network_name}.'}
 
-# 添加网元到站点
-def add_ne_to_site(network_name, site_name, device):
+# 添加或移动网元到指定站点
+def move_ne_to_site(network_name, ne_name, new_site_name, action_type):
     db = get_db()
     networks_collection = db.get_collection('networks')
 
     # 查找网络
     network = networks_collection.find_one({"network_name": network_name})
-    if not network:
-        return {'status': 'failure', 'message': f'Network {network_name} not found.'}
+    
+    # 变量用于存储要移动的网元以及它的当前站点
+    element_to_move = None
+    current_site = None
 
-    # 将设备数据转换为数据库格式
-    element = convert_device_to_db_format(device)
+    # 如果是 Join Site 操作，从网络根的 elements 列表中查找网元
+    if action_type == 'Join Site':
+        for element in network['elements']:
+            if element.get('ne_name') == ne_name:
+                element_to_move = element
+                break
 
-    # 查找站点并添加设备到站点的 elements 列表
-    for site in network['sites']:
-        if site['site_name'] == site_name:
-            site['elements'].append(element)
-            break
-    else:
-        return {'status': 'failure', 'message': f'Site {site_name} not found in network {network_name}.'}
+        if not element_to_move:
+            return {'status': 'failure', 'message': f'NE {ne_name} not found in network-level elements.'}
+    
+    # 如果是 Change Site 操作，从各个站点中查找网元
+    elif action_type == 'Change Site':
+        for site in network['sites']:
+            for element in site['elements']:
+                if element.get('ne_name') == ne_name:
+                    current_site = site
+                    element_to_move = element
+                    break
+            if current_site:
+                break
+
+        if not current_site or not element_to_move:
+            return {'status': 'failure', 'message': f'NE {ne_name} not found in any site of network {network_name}.'}
+    
+    # 查找目标站点
+    target_site = next((site for site in network['sites'] if site['site_name'] == new_site_name), None)
+    if not target_site:
+        return {'status': 'failure', 'message': f'Site {new_site_name} not found in network {network_name}.'}
+
+    # 检查目标站点中是否已经存在该网元
+    for element in target_site['elements']:
+        if element.get('ne_name') == ne_name:
+            return {'status': 'failure', 'message': f'NE {ne_name} already exists in site {new_site_name}.'}
+
+    # 如果是 Change Site 操作，从当前站点中移除网元
+    if action_type == 'Change Site':
+        current_site['elements'] = [el for el in current_site['elements'] if el.get('ne_name') != ne_name]
+    
+    # 如果是 Join Site 操作，从网络根的 elements 列表中移除网元
+    elif action_type == 'Join Site':
+        network['elements'] = [el for el in network['elements'] if el.get('ne_name') != ne_name]
+
+    # 将网元添加到目标站点
+    target_site['elements'].append(element_to_move)
 
     # 更新网络信息
-    result = networks_collection.update_one({"network_name": network_name}, {"$set": network})
-    if result.modified_count > 0:
-        return {'status': 'success', 'message': f'NE {element["ne_name"]} added to site {site_name} in network {network_name}.'}
-    else:
-        return {'status': 'failure', 'message': f'Failed to add NE to site {site_name} in network {network_name}.'}
+    result = networks_collection.update_one(
+        {"network_name": network_name},
+        {"$set": {"sites": network['sites'], "elements": network['elements']}}
+    )
 
-# 添加网元到网络的根层次
-def add_ne_to_network_root(network_name, device):
+    if result.modified_count > 0:
+        return {'status': 'success', 'message': f'NE {ne_name} successfully moved to site {new_site_name}.'}
+    else:
+        return {'status': 'failure', 'message': f'Failed to move NE {ne_name} to site {new_site_name}.'}
+
+# 移除网元从站点并返回完整的 element 对象
+def remove_ne_from_site(network_name, ne_name):
     db = get_db()
     networks_collection = db.get_collection('networks')
 
@@ -146,18 +187,61 @@ def add_ne_to_network_root(network_name, device):
     if not network:
         return {'status': 'failure', 'message': f'Network {network_name} not found.'}
 
-    # 将设备数据转换为数据库格式
-    element = convert_device_to_db_format(device)
+    # 遍历站点，找到并移除网元
+    for site in network['sites']:
+        print(f"Checking site: {site['site_name']}, current elements: {site['elements']}")
+        original_count = len(site['elements'])
 
-    # 添加设备到网络的根 elements 列表
+        # 查找网元
+        for element in site['elements']:
+            if element.get('ne_name') == ne_name:
+                element_to_remove = element
+                break
+        else:
+            continue  # 如果没有找到，跳到下一个站点
+
+        # 移除网元
+        site['elements'] = [el for el in site['elements'] if el.get('ne_name') != ne_name]
+
+        # 如果网元确实存在并被移除，则更新数据库
+        if original_count != len(site['elements']):
+            print(f"NE {ne_name} removed from site {site['site_name']}.")
+            result = networks_collection.update_one({"_id": network['_id']}, {"$set": {'sites': network['sites']}})
+            if result.modified_count > 0:
+                return {'status': 'success', 'element': element_to_remove, 'message': f'NE {ne_name} removed from site {site["site_name"]}.'}
+            else:
+                print(f"Error: Failed to update site {site['site_name']} after removing NE {ne_name}.")
+                return {'status': 'failure', 'message': 'Failed to remove NE from the site.'}
+
+    return {'status': 'failure', 'message': f'NE {ne_name} not found in any site.'}
+
+def add_ne_to_network_root(network_name, element):
+    db = get_db()
+    networks_collection = db.get_collection('networks')
+
+    # 查找网络
+    network = networks_collection.find_one({"network_name": network_name})
+    if not network:
+        return {'status': 'failure', 'message': f'Network {network_name} not found.'}
+
+    # 确保网元不在根目录
+    for el in network['elements']:
+        if el.get('ne_name') == element.get('ne_name'):
+            return {'status': 'failure', 'message': f'NE {element["ne_name"]} already exists in network root.'}
+
+    # 将网元添加到网络根目录
     network['elements'].append(element)
 
     # 更新网络信息
-    result = networks_collection.update_one({"network_name": network_name}, {"$set": network})
+    result = networks_collection.update_one(
+        {"_id": network['_id']},
+        {"$set": {"elements": network['elements']}}
+    )
+
     if result.modified_count > 0:
-        return {'status': 'success', 'message': f'NE {element["ne_name"]} added to the root level of network {network_name}.'}
+        return {'status': 'success', 'message': f'NE {element["ne_name"]} added to network root.'}
     else:
-        return {'status': 'failure', 'message': f'Failed to add NE to the root level of network {network_name}.'}
+        return {'status': 'failure', 'message': f'Failed to add NE {element["ne_name"]} to network root.'}
 
 # 查找所有网络
 def get_all_networks():

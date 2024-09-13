@@ -1,11 +1,11 @@
-from flask import Blueprint, render_template, jsonify, request, after_this_request
+from flask import Blueprint, render_template, jsonify, request
 from .hw_disc import (
     get_snmpv3_data, discover_neighbors, query_device_via_gateway, is_valid_ip, 
     filter_ssh_params, devices
 )
 from netmiko import ConnectHandler
 from services.db import get_db
-from models.network import convert_device_to_db_format, ne_exists_in_network
+from models.network import convert_device_to_db_format, move_ne_to_site, add_ne_to_network_root, remove_ne_from_site
 from bson import ObjectId
 import logging
 
@@ -20,7 +20,6 @@ def get_elements(network_name):
 @ne_mgmt_bp.route('/<network_name>/elements/add', methods=['POST'])
 def add_device(network_name):
     data = request.json
-    site_name = data.get('site_name', None)  # 获取 site_name (可选)
     print("Received data from frontend:", data)  # 打印接收到的前端数据
 
     ne_name = data['ne_name']
@@ -53,38 +52,7 @@ def add_device(network_name):
             return jsonify({'status': 'failure', 'error': f'SSH connection failed: {str(e)}'}), 500
     else:
         return jsonify({'status': 'failure', 'error': 'Invalid IP address.'}), 400
-
-# 更新网元的 site 归属
-@ne_mgmt_bp.route('/<network_name>/elements/update_site', methods=['POST'])
-def update_device_site(network_name):
-    data = request.json
-    ne_name = data['ne_name']
-    new_site_name = data['new_site_name']  # 要移动到的新站点名称
-    print(f"Updating site for {ne_name} in network {network_name} to {new_site_name}")
-
-    db = get_db()
-    network_collection = db.get_collection('networks')
-    network = network_collection.find_one({'network_name': network_name})
-    if not network:
-        return jsonify({'status': 'failure', 'error': f'Network {network_name} not found.'}), 404
-
-    # 查找设备是否在网络的 sites 中
-    device_in_sites = next((device for device in network.get('sites', []) if device['device_name'] == ne_name), None)
-    if device_in_sites:
-        # 移动设备到新站点
-        site = next((site for site in network.get('sites', []) if site['site_name'] == new_site_name), None)
-        if not site:
-            return jsonify({'status': 'failure', 'error': f'Site {new_site_name} not found in network {network_name}.'}), 404
-
-        site.setdefault('elements', []).append(device_in_sites)
-        network['sites'] = [device for device in network['sites'] if device['device_name'] != ne_name]  # 从 sites 中删除设备
-        network_collection.update_one({'_id': ObjectId(network['_id'])}, {'$set': {'sites': network['sites'], 'sites': network.get('sites', [])}})
-
-        print(f"Moved device {ne_name} to site {new_site_name}")
-        return jsonify({'status': 'success', 'message': f'Device {ne_name} moved to site {new_site_name}.'}), 200
-    else:
-        return jsonify({'status': 'failure', 'error': f'Device {ne_name} not found in network {network_name} sites.'}), 404
-
+    
 # 设置 SNMP 配置
 @ne_mgmt_bp.route('/<network_name>/<ne_name>/set_snmp', methods=['POST'])
 def set_snmp(network_name, ne_name):
@@ -116,7 +84,8 @@ def set_snmp(network_name, ne_name):
         logging.error("Device not found.")
         return jsonify({'status': 'failure', 'error': 'Device not found.'}), 404
 
-# 发现网元的邻居
+
+ # 发现网元的邻居
 @ne_mgmt_bp.route('/<network_name>/<ne_name>/discover', methods=['POST'])
 def discover_neighbors_route(network_name, ne_name):
     device = devices.get(ne_name)
@@ -126,7 +95,99 @@ def discover_neighbors_route(network_name, ne_name):
        
         return jsonify({'status': 'success', 'neighbors': neighbors, 'devices': list(devices.values())}), 200
     else:
-        return jsonify({'status': 'failure', 'error': f'NE {ne_name} not found'}), 404
+        return jsonify({'status': 'failure', 'error': f'NE {ne_name} not found'}), 404   
+
+# 保存初始化完成后的设备到 MongoDB 数据库
+@ne_mgmt_bp.route('/<network_name>/elements/save', methods=['POST'])
+def save_devices_to_db(network_name):
+    try:
+        db = get_db()
+        network_collection = db.get_collection('networks')
+
+        # 简化处理：假设网络已存在，直接更新网络信息
+        elements = []
+        for device in devices.values():
+            element = convert_device_to_db_format(device)
+            elements.append(element)
+
+        # 更新网络中的元素列表（覆盖或插入新的设备数据）
+        network_collection.update_one(
+            {'network_name': network_name},
+            {'$set': {'elements': elements}},
+            upsert=True  # 如果网络不存在，则插入一个新文档
+        )
+
+        logging.info(f"Saved devices for network {network_name} to MongoDB.")
+        return jsonify({'status': 'success', 'message': f'Devices for network {network_name} saved successfully.'}), 200
+    except Exception as e:
+        logging.error(f"Failed to save devices to MongoDB: {str(e)}")
+        return jsonify({'status': 'failure', 'error': f'Failed to save devices to database: {str(e)}'}), 500
+
+# 更新或初次分配设备所属的站点
+@ne_mgmt_bp.route('/<network_name>/elements/update_site', methods=['POST'])
+def update_ne_site(network_name):
+    try:
+        # 从前端获取设备名称、目标站点名称以及操作类型
+        data = request.json
+        ne_name = data['ne_name']
+        new_site_name = data['new_site_name']
+        action_type = data['action_type']  # Join Site 或 Change Site
+
+        # 打印接收到的数据
+        print(f"Received request to move NE '{ne_name}' to site '{new_site_name}' in network '{network_name}' with action '{action_type}'")
+
+        # 调用 move_ne_to_site 来处理网元的迁移
+        result = move_ne_to_site(network_name, ne_name, new_site_name, action_type)
+
+        if result['status'] == 'success':
+            print(f"Device '{ne_name}' successfully moved to site '{new_site_name}'.")
+            return jsonify({'status': 'success', 'message': result['message']}), 200
+        else:
+            print(f"Failed to move device '{ne_name}' to site '{new_site_name}': {result['message']}")
+            return jsonify({'status': 'failure', 'message': result['message']}), 500
+
+    except Exception as e:
+        print(f"Failed to update device site: {str(e)}")
+        return jsonify({'status': 'failure', 'message': f'Failed to update device site: {str(e)}'}), 500
+
+@ne_mgmt_bp.route('/<network_name>/elements/remove_ne', methods=['POST'])
+def remove_ne_from_site_route(network_name):
+    try:
+        # 从前端获取网元名称
+        data = request.json
+        ne_name = data['ne_name']
+
+        # 调用 network.py 中的 remove_ne_from_site 函数来移除网元
+        result = remove_ne_from_site(network_name, ne_name)
+        if result['status'] == 'failure':
+            return jsonify(result), 404
+
+        # 将设备添加到网络的根层次，保持完整字段信息
+        element_to_move = result['element']  # 从 remove_ne_from_site 返回完整的 element 对象
+        root_result = add_ne_to_network_root(network_name, element_to_move)
+        
+        if root_result['status'] == 'success':
+            return jsonify({'status': 'success', 'message': f'NE {ne_name} moved to network root successfully.'}), 200
+        else:
+            return jsonify({'status': 'failure', 'message': f'Failed to add NE {ne_name} to network root.'}), 500
+
+    except Exception as e:
+        return jsonify({'status': 'failure', 'message': f'Failed to remove NE from site: {str(e)}'}), 500
+
+@ne_mgmt_bp.route('/network_elements', methods=['GET'])
+def get_all_ne_elements():
+    try:
+        # 从数据库中获取所有网元信息
+        db = get_db()
+        networks = db.get_collection('networks').find()
+
+        elements = []
+        for network in networks:
+            elements.extend(network.get('elements', []))  # 提取每个网络中的网元
+
+        return jsonify(elements), 200
+    except Exception as e:
+        return jsonify({'status': 'failure', 'message': str(e)}), 500
 
 # 获取网元的配置
 @ne_mgmt_bp.route('/<network_name>/<ne_name>/Config', methods=['GET'])
