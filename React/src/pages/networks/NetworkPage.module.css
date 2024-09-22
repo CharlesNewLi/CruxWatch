@@ -20,6 +20,12 @@
   color: #003366; /* 深蓝色标题，符合网络管理主题 */
 }
 
+.sidebarButton {
+  display: flex; /* 使用flex布局，将子项水平排列 */
+  justify-content: space-between; /* 在父容器中均匀分布每个子项 */
+  margin-bottom: 5%;
+}
+
 .networkTree {
   margin-top: 20px;
   border-top: 1px solid #e0e0e0; /* 树结构上方添加分隔线 */
@@ -28,50 +34,7 @@
 
 .content {
   flex: 3; /* 动态调整宽度的内容区域 */
-  padding: 40px;
   background-color: #ffffff;
-  margin-left: 20px; /* 与侧边栏分隔开一点距离 */
   border-radius: 8px; /* 让右侧区域有圆角 */
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); /* 右侧区域阴影 */
-}
-
-.panel {
-  width: 100%;
-  padding: 20px;
-  background-color: #f9f9f9;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.panelSpace {
-  width: 100%;
-}
-
-.networkForm {
-  display: flex;
-  align-items: center;
-  margin-bottom: 20px;
-}
-
-.addNeButton {
-  margin-left: 10px;
-}
-
-.neList {
-  background-color: #fff;
-  padding: 10px;
-  border-radius: 4px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
-}
-
-.buttonSpace {
-  margin-top: 20px;
-}
-
-.topoViewContainer {
-  margin-top: 30px;
-  background-color: #fff;
-  padding: 20px;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }

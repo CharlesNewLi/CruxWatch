@@ -1,31 +1,49 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
+import { useSelector } from "../../redux/hooks"; 
 import styles from "./NetworkSummary.module.css";
+import Sider from "antd/lib/layout/Sider";
 
-interface Network {
-  name: string;
-  siteCount: number;
-  neCount: number;
+interface NetworkSummaryProps {
+  onNetworkSelect: (network: any) => void;
 }
 
-export const NetworkSummary: React.FC = () => {
-  const [networks, setNetworks] = useState<Network[]>([
-    { name: "Network A", siteCount: 10, neCount: 100 },
-    { name: "Network B", siteCount: 15, neCount: 120 },
-    { name: "Network C", siteCount: 8, neCount: 80 },
-    { name: "Network D", siteCount: 20, neCount: 150 },
-  ]);
+export const NetworkSummary: React.FC<NetworkSummaryProps> = ({ onNetworkSelect }) => {
+
+
+  // 从 Redux store 中获取状态
+  const networksStats = useSelector((state) => state.networks.data);
+  const networksLoading = useSelector((state) => state.networks.loading);
+  const networksError = useSelector((state) => state.networks.error);
+
+  // 加载状态处理
+  if (networksLoading) return <div>Loading...</div>;
+  if (networksError) return <div>Error: {networksError}</div>;
+
+  // 如果没有数据
+  if (!networksStats?.networks?.length) {
+    return <div>No networks available</div>;
+  }
 
   return (
     <div className={styles.outer}>
-      <div className={styles.inner}>
-        {networks.map((network, index) => (
-          <div key={index} className={styles.item}>
-            <div className={styles.networkName}>{network.name}</div>
-            <div className={styles.networkDetail}>Sites: {network.siteCount}</div>
-            <div className={styles.networkDetail}>NEs: {network.neCount}</div>
+      {networksStats.networks.map((network) => (
+        <Sider width={"auto"} className={styles.inner} key={network.network_id}
+          onClick={() => {
+            onNetworkSelect(network); }} 
+        >
+          <div className={styles.item}>
+            <div className={styles.networkName}>{network.network_name}</div>
+            <div className={styles.networkDetail}>
+              <span className={styles.label}>Sites:</span>
+              <span className={styles.data}>{network.site_count}</span>
+            </div>
+            <div className={styles.networkDetail}>
+              <span className={styles.label}>NEs:</span>
+              <span className={styles.data}>{network.ne_count}</span>
+            </div>
           </div>
-        ))}
-      </div>
+        </Sider>
+      ))}
     </div>
   );
 };

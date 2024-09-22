@@ -82,82 +82,6 @@ def get_snmpv3_data(device):
 
     return data
 
-# Discover neighboring devices via SNMP
-def discover_neighbors(device):
-    snmp_params = filter_snmp_params(device)
-    auth_protocol = usmHMACSHAAuthProtocol if snmp_params.get('auth_protocol') == 'SHA' else usmHMACMD5AuthProtocol
-    priv_protocol = usmAesCfb128Protocol if snmp_params.get('priv_protocol') == 'AES128' else usmDESPrivProtocol
-    
-    neighbors = []
-    logging.debug(f"Discovering neighbors for device {device['device_name']}")
-    iterator = nextCmd(
-        SnmpEngine(),
-        UsmUserData(snmp_params['username'], snmp_params['auth_password'], snmp_params['priv_password'],
-                    authProtocol=auth_protocol,
-                    privProtocol=priv_protocol),
-        UdpTransportTarget((snmp_params['ip'], 161), timeout=10.0, retries=5),
-        ContextData(),
-        ObjectType(ObjectIdentity('1.0.8802.1.1.2.1.4.1.1.9')),  # lldpRemSysName
-        ObjectType(ObjectIdentity('1.0.8802.1.1.2.1.4.2.1.4')),  # lldpRemManAddr
-        lexicographicMode=False
-    )
-
-    for errorIndication, errorStatus, errorIndex, varBinds in iterator:
-        if errorIndication:
-            logging.error(f"Error indication: {errorIndication}")
-            continue
-        elif errorStatus:
-            logging.error(f"Error status: {errorStatus.prettyPrint()}")
-            continue
-        
-        ne_name = str(varBinds[0][1])  # Neighbor device's system name
-        addr_oid = varBinds[1][0].prettyPrint()
-        oid_parts = addr_oid.split('.')
-        try:
-            ne_ip = '.'.join(oid_parts[-4:])  # Last four parts of OID as IP address
-        except Exception as e:
-            logging.error(f"Failed to extract IP from OID: {e}")
-            ne_ip = None
-
-        logging.debug(f"Neighbor Name: {ne_name}, Address OID: {addr_oid}, Parsed IP: {ne_ip}")
-
-        if ne_ip is None or not is_valid_ip(ne_ip):
-            logging.error(f"Invalid or missing IP address discovered: {ne_ip}")
-            continue
-
-        # Generate neighbor device key dynamically
-        ne_device_key = ne_name
-        ne_device = {
-            'device_type': 'huawei',
-            'device_name': ne_name,
-            'ip': ne_ip,
-            'ssh_username': device['ssh_username'],  # Use SSH credentials from the main device
-            'ssh_password': device['ssh_password'],
-            'ssh_secret': device['ssh_secret'],
-            'verbose': device['verbose'],
-            'global_delay_factor': device['global_delay_factor'],
-            'session_log': f'session_log_{ne_name}.txt',
-            'gne': device['ip'],  # Set GNE to the device that discovered it
-            'network_name': device['network_name']
-        }
-
-        # Add new neighbor device to the devices dictionary
-        if not any(d['ip'] == ne_ip for d in devices.values()):
-            devices[ne_device_key] = ne_device
-            neighbors.append(ne_device_key)
-    
-    logging.debug(f"Devices dictionary after neighbor discovery: {devices}")
-    
-    return neighbors
-
-# Log connection attempts
-def log_connection_attempt(device):
-    logging.debug(f"Connecting to device {device['device_name']} at IP: {device['ip']}")
-
-# Log command execution
-def log_command_execution(command, device):
-    logging.debug(f"Executing command: {command} on device {device['device_name']} at IP: {device['ip']}")
-
 # Query device via GNE as a gateway
 def query_device_via_gateway(gne_device, target_device, command):
     try:
@@ -208,7 +132,6 @@ def query_device_via_gateway(gne_device, target_device, command):
             command_output = ""
 
         # Use a general prompt regex pattern to match all device prompts
-        log_command_execution(command, target_device)
         command_output += connection.send_command(command, expect_string=r'[>#]', read_timeout=20)
 
         connection.send_command_timing('quit')
@@ -219,11 +142,3 @@ def query_device_via_gateway(gne_device, target_device, command):
     except Exception as e:
         logging.error(f"Error during SSH connection: {str(e)}")
         return {'status': 'failure', 'error': str(e)}
-
-# Log connection attempts
-def log_connection_attempt(device):
-    logging.debug(f"Connecting to device {device['device_name']} at IP: {device['ip']}")
-
-# Log command execution
-def log_command_execution(command, device):
-    logging.debug(f"Executing command: {command} on device {device['device_name']} at IP: {device['ip']}")

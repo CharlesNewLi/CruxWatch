@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
+import { useSelector } from "../../redux/hooks"; 
+import { useNavigate } from "react-router-dom";
 import styles from "./Header.module.css";
 import shield from "../../assets/shield.png";
 import star from "../../assets/star.png";
@@ -7,29 +9,11 @@ import { WifiOutlined, EnvironmentOutlined, GlobalOutlined, BellOutlined,
          QuestionCircleOutlined, SettingOutlined, FileTextOutlined } from "@ant-design/icons";
 
 export const Header: React.FC = () => {
-  const stats = {
-    networks: 0,
-    sites: 0,
-    devices: 0
-  };
 
   const [visibleDropdown, setVisibleDropdown] = useState<string | null>(null);
   const [location, setLocation] = useState<string>("Unknown Location");
-
-  useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords;
-          setLocation(`Lat: ${latitude.toFixed(2)}, Lon: ${longitude.toFixed(2)}`);
-        },
-        (error) => {
-          console.error("Error fetching location:", error);
-        }
-      );
-    }
-  }, []);
-
+  const navigate = useNavigate();
+  
   const handleIconClick = (type: string) => {
     setVisibleDropdown(visibleDropdown === type ? null : type);
   };
@@ -46,10 +30,20 @@ export const Header: React.FC = () => {
     );
   };
 
+  const networksOnlineStats = useSelector((state) => state.networks.data);
+  const networksLoading = useSelector((state) => state.networks.loading);
+  const networksError = useSelector((state) => state.networks.error);
+
+  // 从 networksOnlineStats中读取总计的数据
+  const totalOnlineNetworks = networksOnlineStats?.total_online_networks ?? 0;
+  const totalOnlineSites = networksOnlineStats?.total_online_sites ?? 0;
+  const totalOnlineNes = networksOnlineStats?.total_online_nes ?? 0;
+
+
   return (
     <div className={styles["app-header"]}>
       <div className={styles["header-container"]}>
-        <div className={styles["logo-header"]}>
+        <div className={styles["logo-header"]} onClick={() => navigate("/")}>
           <div className={styles["logo-pattern"]}>
             <img src={shield} alt="shield" className={styles["shield-logo"]} />
             <img src={star} alt="star1" className={`${styles["star-logo"]} ${styles["star1"]}`} />
@@ -68,18 +62,18 @@ export const Header: React.FC = () => {
         </div>
         <div className={styles["stats-header"]}>
           <div className={styles["stats-item"]}>
-            <div className={styles["stats-number"]}>{stats.networks}</div>
+            <div className={styles["stats-number"]}>{totalOnlineNetworks}</div>
             <div className={styles["stats-label"]}>Network(s)</div>
           </div>
           <div className={styles["stats-item"]}>
-            <div className={styles["stats-number"]}>{stats.sites}</div>
+            <div className={styles["stats-number"]}>{totalOnlineSites}</div>
             <div className={styles["stats-label"]}>Site(s)</div>
           </div>
           <div className={styles["stats-item"]}>
-            <div className={styles["stats-number"]}>{stats.devices}</div>
+            <div className={styles["stats-number"]}>{totalOnlineNes}</div>
             <div className={styles["stats-label"]}>Device(s)</div>
           </div>
-        </div>
+        </div>      
         <div className={styles["top-header"]}>
           <div className={styles["top-button"]} onClick={() => handleIconClick("network")}>
             <WifiOutlined className={styles["button-icon"]}/>

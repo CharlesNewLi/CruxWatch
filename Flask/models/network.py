@@ -1,5 +1,6 @@
 from services.db import get_db
 from bson import ObjectId
+import logging
 
 # 将设备数据转换为数据库格式
 def convert_device_to_db_format(device):
@@ -64,7 +65,11 @@ def create_network(network_name, site_names, ne_names=None, site_locations=None)
         "network_id": str(ObjectId()),  # 为网络生成唯一的 key
         "network_name": network_name,  # 使用 network_name 作为网络名称
         "sites": sites,  # 包含多个站点
-        "elements": []  # 初始化网络根的空网络元素（NE）列表
+        "elements": [],  # 初始化网络根的空网络元素（NE）列表
+        "topo_data": {
+            "nodes": [],  # 初始化节点列表
+            "edges": []   # 初始化连接列表
+        }
     }
 
     # 为网络根层次添加 elements
@@ -342,6 +347,29 @@ def update_ne_status(network_name, site_name, ne_name, status):
                     ne['status'] = status  # 更新网络元素（NE）状态
 
     return networks_collection.update_one({"network_name": network_name}, {"$set": network})
+
+# 将更新后的拓扑数据存储到数据库中的对应网络
+def save_topology_to_db(network_name, topo_data):
+    try:
+        db = get_db()
+        network_collection = db.get_collection('networks')
+
+        # 更新网络的 topo_data 字段
+        result = network_collection.update_one(
+            {"network_name": network_name},  # 查找条件
+            {"$set": {"topo_data": topo_data}}  # 更新拓扑数据
+        )
+
+        if result.matched_count > 0:
+            logging.info(f"Successfully updated topology data for network: {network_name}")
+            return {'status': 'success', 'message': f'Topology data updated successfully for network {network_name}'}
+        else:
+            logging.warning(f"Network {network_name} not found.")
+            return {'status': 'failure', 'message': f'Network {network_name} not found.'}
+
+    except Exception as e:
+        logging.error(f"Failed to update topology data for network {network_name}: {str(e)}")
+        return {'status': 'failure', 'message': f'Failed to update topology data: {str(e)}'}
 
 # 删除网络
 def delete_network(network_name):

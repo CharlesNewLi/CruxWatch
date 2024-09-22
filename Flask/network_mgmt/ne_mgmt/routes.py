@@ -1,15 +1,22 @@
-from flask import Blueprint, render_template, jsonify, request
-from .hw_disc import (
-    get_snmpv3_data, discover_neighbors, query_device_via_gateway, is_valid_ip, 
-    filter_ssh_params, devices
+from flask import Blueprint, jsonify, request
+from network_mgmt.global_data import devices, devices_snmp, topo_data
+from .ne_init import (
+    get_snmpv3_data, discover_neighbors, is_valid_ip, 
+    filter_ssh_params
 )
+from .topo_init import update_topo_data
 from netmiko import ConnectHandler
 from services.db import get_db
-from models.network import convert_device_to_db_format, move_ne_to_site, add_ne_to_network_root, remove_ne_from_site
-from bson import ObjectId
+from models.network import convert_device_to_db_format, move_ne_to_site, add_ne_to_network_root, remove_ne_from_site, save_topology_to_db
 import logging
 
 ne_mgmt_bp = Blueprint('ne_mgmt_bp', __name__)
+
+def clean_input(value):
+    """Helper function to clean input by stripping leading/trailing whitespace."""
+    if isinstance(value, str):
+        return value.strip()
+    return value  # 如果不是字符串，直接返回原值
 
 # 获取当前网络中的所有网元信息
 @ne_mgmt_bp.route('/<network_name>/elements', methods=['GET'])
@@ -27,6 +34,7 @@ def add_device(network_name):
     # 准备用于SSH连接的设备信息，使用前端传递的 gne 字段
     gne_device = {
         'device_type': data['ne_make'],
+        'ne_type': data['ne_type'],
         'device_name': ne_name,
         'ip': data['ne_ip'],
         'ssh_username': data['ssh_username'],
@@ -45,9 +53,12 @@ def add_device(network_name):
             # 将设备信息直接存入 devices 字典中，无需子字典
             devices[ne_name] = gne_device
             print(f"Device data in devices: {devices}")
-            logging.debug(f"SSH session established for device {ne_name}. Current devices: {list(devices.keys())}")
-    
-            return jsonify({'status': 'success', 'message': f'Device {ne_name} added successfully.', 'devices': list(devices.values())}), 201
+            logging.debug(f"SSH session established for device {ne_name}. Current devices: {list(devices.keys())}")           
+
+            # 更新全局拓扑数据
+            update_topo_data(network_name)
+
+            return jsonify({'status': 'success', 'message': f'Device {ne_name} added successfully.', 'device': gne_device, 'topology': topo_data }), 201
         except Exception as e:    
             return jsonify({'status': 'failure', 'error': f'SSH connection failed: {str(e)}'}), 500
     else:
@@ -57,7 +68,9 @@ def add_device(network_name):
 @ne_mgmt_bp.route('/<network_name>/<ne_name>/set_snmp', methods=['POST'])
 def set_snmp(network_name, ne_name):
     data = request.json
-    ne_name = data.get('ne_name').strip()
+    print(f"Received data: {data}")  
+    ne_name = data.get('ne_name')
+    ne_name = clean_input(ne_name) 
     device = devices.get(ne_name)
         
     if device:
@@ -70,13 +83,28 @@ def set_snmp(network_name, ne_name):
             'snmp_priv_password': data['snmp_priv_password'],
         })
 
+        print(f"Updated device data: {device}")  # 打印更新后的 device 数据
+
         try:
-            snmp_data = get_snmpv3_data(device)
-            logging.debug(f"SNMP setup successful, retrieved data: {snmp_data}")
-            
+            device_snmp = get_snmpv3_data(device)
+            logging.debug(f"SNMP setup successful, retrieved data: {device_snmp}")
+            print(f"device_snmp:'{device_snmp}")
+
+            # 将 SNMP 数据存储到全局的 snmp_data_store 中
+            devices_snmp[ne_name] = device_snmp
+
+            # 更新全局拓扑数据
+            update_topo_data(network_name)
+
+            # 只选择部分 SNMP 数据传递给前端
+            device_snmp_basic = {
+                'Device Name': device_snmp.get('Device Name'),
+                'Device Version': device_snmp.get('Device Version')
+            }
+
             device['snmp_setup_success'] = True  # Mark SNMP setup success
             
-            return jsonify({'status': 'success', 'message': 'SNMP setup successful.', 'snmp_data': snmp_data, 'devices': list(devices.values())}), 200
+            return jsonify({'status': 'success', 'message': 'SNMP setup successful.', 'device_snmp': device_snmp_basic, 'devices': list(devices.values())}), 200
         except Exception as e:
             logging.error(f"SNMP setup failed: {str(e)}")
             return jsonify({'status': 'failure', 'error': f'SNMP setup failed: {str(e)}'}), 500
@@ -88,12 +116,19 @@ def set_snmp(network_name, ne_name):
  # 发现网元的邻居
 @ne_mgmt_bp.route('/<network_name>/<ne_name>/discover', methods=['POST'])
 def discover_neighbors_route(network_name, ne_name):
+    ne_name = clean_input(ne_name) 
     device = devices.get(ne_name)
     if device:
-        neighbors = discover_neighbors(device)
+        neighbors, ne_connections = discover_neighbors(device)
+        
+        logging.debug(f"Neighbor connections: {ne_connections}") 
+        print(f"Neighbor connections: {ne_connections}") 
         logging.debug(f"Current devices in dictionary after discovering neighbors in /discover: {list(devices.keys())}")
        
-        return jsonify({'status': 'success', 'neighbors': neighbors, 'devices': list(devices.values())}), 200
+        # 更新全局拓扑数据
+        update_topo_data(network_name)
+
+        return jsonify({'status': 'success', 'neighbors': neighbors, 'devices': list(devices.values()), 'topology': topo_data}), 200
     else:
         return jsonify({'status': 'failure', 'error': f'NE {ne_name} not found'}), 404   
 
@@ -116,6 +151,9 @@ def save_devices_to_db(network_name):
             {'$set': {'elements': elements}},
             upsert=True  # 如果网络不存在，则插入一个新文档
         )
+        
+        # 保存拓扑数据
+        save_result = save_topology_to_db(network_name, topo_data)
 
         logging.info(f"Saved devices for network {network_name} to MongoDB.")
         return jsonify({'status': 'success', 'message': f'Devices for network {network_name} saved successfully.'}), 200
@@ -188,57 +226,3 @@ def get_all_ne_elements():
         return jsonify(elements), 200
     except Exception as e:
         return jsonify({'status': 'failure', 'message': str(e)}), 500
-
-# 获取网元的配置
-@ne_mgmt_bp.route('/<network_name>/<ne_name>/Config', methods=['GET'])
-def get_config(network_name, ne_name):
-    device = devices.get(ne_name.strip())
-    
-    if not device:
-        return jsonify({'error': f'NE {ne_name} not found'}), 404
-    
-    logging.debug(f"Devices dictionary content: {devices}")
-    
-    command = 'display current-configuration'
-    
-    if device['ip'] == device.get('gne'):
-        gne_device = device
-    else:
-        gne_ip = device.get('gne')
-        logging.debug(f"Attempting to find GNE device with IP: {gne_ip}")
-
-        gne_device_name = None
-        for name, dev in devices.items():
-            if dev['ip'] == gne_ip:
-                gne_device_name = name
-                break
-
-        if not gne_device_name:
-            logging.error(f"GNE device not found in devices dictionary for IP: {gne_ip}")
-            return jsonify({'error': 'GNE device not found for the target device'}), 404
-        else:
-            gne_device = devices[gne_device_name]
-    
-    result = query_device_via_gateway(gne_device, device, command)
-    
-    if result['status'] == 'success':
-        return render_template('configure.html', device_name=ne_name, result=result['output'])
-    else:
-        return render_template('configure.html', device_name=ne_name, result=result['error'])
-
-# 获取网元的 SNMP 信息
-@ne_mgmt_bp.route('/<network_name>/<ne_name>/Info', methods=['GET'])
-def get_info(network_name, ne_name):
-    device = devices.get(ne_name.strip())
-
-    if not device:
-        return jsonify({'error': f'Device {ne_name} not found'}), 404
-
-    if 'ip' in device:
-        try:
-            data = get_snmpv3_data(device)
-            return render_template('info.html', device_name=ne_name, data=data)
-        except Exception as e:
-            return render_template('info.html', device_name=ne_name, error=str(e))
-    else:
-        return render_template('info.html', device_name=ne_name, error=f'SNMP not configured for device {ne_name}')

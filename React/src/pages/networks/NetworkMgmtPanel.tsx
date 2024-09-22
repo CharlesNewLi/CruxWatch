@@ -5,11 +5,11 @@ import styles from "./NetworkPage.module.css";
 
 const { Title } = Typography;
 
-interface NetworkManagementPanelProps {
+interface NetworkMgmtPanelProps {
   networkName: string;
 }
 
-export const NetworkManagementPanel: React.FC<NetworkManagementPanelProps> = ({
+export const NetworkMgmtPanel: React.FC<NetworkMgmtPanelProps> = ({
   networkName,
 }) => {
   return (

@@ -20,6 +20,13 @@
     width: auto;
     flex-direction: row; /* 将排列方向改为水平排列 */
     align-items: center; /* 水平居中对齐 */
+    cursor: pointer;
+    transform: translateZ(0); /* 确保3D效果正确应用 */
+	  transition: transform 0.25s ease-out; /* 控制 transform 属性的过渡效果 */
+  }
+
+  .logo-header:hover {
+    transform: scale(1.05); /* 鼠标悬停时，放大元素 */
   }
 
   .logo-pattern {

@@ -1,11 +1,16 @@
 from flask import Blueprint, render_template, jsonify, request
 from models.network import (
-    create_network, get_all_networks, get_network_by_name, delete_network, 
+    create_network, get_network_by_name, delete_network, 
     add_site_to_network, update_network_name, update_site_name, delete_site_from_network
 )
-from .ne_mgmt.hw_disc import discover_neighbors
+from .ne_mgmt.ne_init import discover_neighbors
 from .ne_mgmt.routes import add_device
+from services.db import get_db
 from services.utils import convert_objectid_to_str
+from .network_load import load_data_from_db
+from .ne_mgmt.ne_status import check_all_devices
+from .global_data import network, devices, topo_data
+import logging
 
 network_mgmt_bp = Blueprint('network_mgmt_bp', __name__)
 
@@ -41,22 +46,144 @@ def create_network_route():
         return jsonify({'status': 'failure', 'message': 'Error creating network.'}), 500
 
 # 获取所有网络
-# 渲染页面
 @network_mgmt_bp.route('/', methods=['GET'])
-def render_networks_page():
-    return render_template('networks.html')
+def render_or_get_network_data():
+    db = get_db()
+    networks_collection = db.get_collection('networks')
 
-# 获取所有网络的 JSON 数据
-@network_mgmt_bp.route('/data', methods=['GET'])
-def get_networks_data():
-    networks = get_all_networks()
-    networks = convert_objectid_to_str(networks)
-    
-    # 确保返回的每个网络都包含 `network_name`
-    networks_with_name = [{'network_name': network['network_name'], **network} for network in networks]
-    
-    print(f"Retrieved networks from database: {networks_with_name}")
-    return jsonify(networks_with_name), 200
+    # 查询数据库中的所有网络
+    networks = list(networks_collection.find())
+
+    # 构建要返回的数据结构
+    networks_data = []
+    total_networks = len(networks)  # 网络总数
+    total_sites = 0  # 总站点数
+    total_nes = 0  # 总网元数
+    total_online_sites = 0  # 在线站点数
+    total_online_nes = 0  # 在线网元数
+
+    for network in networks:
+        network_name = network.get('network_name', '')
+        network_id = network.get('network_id', '')  # 获取 network_id
+        sites = network.get('sites', [])
+        site_count = len(sites)  # 站点数量
+        ne_count = sum(len(site.get('elements', [])) for site in sites)  # 每个网络中的网元数量
+
+        # 计算在线的网元数量和在线站点数量
+        online_ne_count = 0  # 在线网元数
+        online_site_count = 0  # 在线站点数
+
+        for site in sites:
+            site_nes = site.get('elements', [])  # 获取每个站点中的网元
+
+            # 计算站点中在线的网元数量
+            for ne in site_nes:
+                ne_name = ne.get('ne_name', '')
+                device_info = devices.get(ne_name, {})
+
+                # 判断该设备是否在线
+                if device_info.get('status') == 'online':
+                    online_ne_count += 1
+                    total_online_nes += 1  # 增加总的在线网元数
+
+            # 如果站点中至少有一个网元在线，则认为站点在线
+            if online_ne_count > 0:
+                online_site_count += 1
+                total_online_sites += 1
+
+        # 构建每个网络的简要信息
+        networks_data.append({
+            'network_id': network_id,  # 返回 network_id
+            'network_name': network_name,  # 返回 network_name
+            'site_count': site_count,  # 返回每个网络中的站点数
+            'ne_count': ne_count,  # 返回每个网络中的网元数
+        })
+
+        total_sites += site_count
+        total_nes += ne_count
+
+    # 构建最终的返回数据
+    result = {
+        'total_networks': total_networks,  # 返回总的网络数
+        'total_sites': total_sites,  # 返回总的站点数
+        'total_online_sites': total_online_sites,  # 返回总的在线站点数
+        'total_nes': total_nes,  # 返回总的网元数
+        'total_online_nes': total_online_nes,  # 返回总的在线网元数
+        'networks': networks_data  # 每个网络的信息（ID、名称、站点数、网元数）
+    }
+
+    # 根据请求的 Accept 头来返回不同的响应
+    if request.accept_mimetypes['application/json']:
+        # 如果请求的是 JSON 数据，返回 JSON 响应
+        return jsonify(result)
+    else:
+        # 否则返回 HTML 页面
+        return render_template('networks.html')
+
+# 获取指定网络管理页面：
+@network_mgmt_bp.route('/<network_id>', methods=['GET'])
+def auto_boot(network_id):
+    # 第一步：加载指定网络的数据到内存（全局变量）
+    network_data = load_data_from_db(network_id)
+        
+    if network_data:
+        network_name = network_data.get('network_name')
+        
+        # 第二步：检查设备状态，发起SNMP连接
+        check_all_devices()
+
+        # 构建返回数据
+        sites_data = {}
+        total_online_nes = 0  # 统计在线设备的数量
+        total_sites = 0       # 统计总的站点数
+        online_sites_count = 0 # 统计在线站点数
+
+        # 遍历每个设备 - 从已经加载到内存中的全局变量 devices 获取数据
+        for device_name, device_data in devices.items():
+            site_id = device_data.get('site_id', 'Unknown')
+            site_name = device_data.get('site_name', 'Unknown')
+            device_status = device_data.get('status', 'offline')
+
+            # 如果站点尚未被添加到 sites_data，则先初始化站点
+            if site_id not in sites_data:
+                sites_data[site_id] = {
+                    'site_id': site_id,
+                    'site_name': site_name,
+                    'devices': [],
+                    'online_nes': 0
+                }
+
+            # 添加设备信息到站点的设备列表
+            sites_data[site_id]['devices'].append({
+                'device_name': device_name,
+                'ne_id': device_data.get('ne_id', ''),
+                'ip': device_data.get('ip', ''),
+                'device_type': device_data.get('device_type', ''),
+                'status': device_status
+            })
+
+            # 更新在线设备和站点的统计信息
+            if device_status == 'online':
+                total_online_nes += 1
+                sites_data[site_id]['online_nes'] += 1
+
+        total_sites = len(sites_data)
+        online_sites_count = sum(1 for site in sites_data.values() if site['online_nes'] > 0)
+
+        # 返回设备数据和拓扑信息
+        return jsonify({
+            'status': 'success',
+            'network_id': network_id,
+            'network_name': network_name,
+            'devices': devices,  # 直接返回内存中的设备信息
+            'topology': topo_data,  # 拓扑数据
+            'sites': list(sites_data.values()),  # 站点数据列表
+            'total_online_nes': total_online_nes,  # 在线设备总数
+            'total_sites': total_sites,  # 站点总数
+            'online_sites_count': online_sites_count  # 在线站点数
+        })
+    else:
+        return jsonify({'status': 'failure', 'message': f'Network {network_id} not found'}), 404
 
 # 在特定网络中添加站点，确保站点名称唯一
 @network_mgmt_bp.route('/<network_name>/add_site', methods=['POST'])

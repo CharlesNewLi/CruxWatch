@@ -1,164 +1,130 @@
 import React, { useState } from "react";
+import { useSelector, useAppDispatch } from "../../redux/hooks"; 
 import styles from "./NetworkPage.module.css";
 import { MainLayout } from "../../layout/mainLayout";
-import { Layout, Tree, Button, Modal, Input, Space, Typography } from "antd";
-import { TopoView } from "../../components";
-import { NetworkInitializationPanel } from "./NetworkInitializationPanel";
-import { NetworkManagementPanel } from "./NetworkManagementPanel";
+import { addNetwork, updateNetwork, deleteNetwork, updateSite, deleteSite } from "../../redux/network/slice";
+import { deleteNetworkSummary } from "../../redux/networks/slice";
+import { Layout, Button, Space, Typography, Modal} from "antd";
+import { NetworkInitTree } from "./NetworkInitTree";
+import { NetworksTree } from "../../components/networkstree";
 import { NetworkForm } from "./NetworkForm";
-import { mockNetworks } from "./mockup";
+import { SiteForm } from "./SiteForm";
+import { NetworkInitPanel } from "./NetworkInitPanel";
+import { NetworkMgmtPanel } from "./NetworkMgmtPanel";
 
 const { Sider, Content } = Layout;
 const { Title } = Typography;
-const { confirm } = Modal;
 
 export const NetworkPage: React.FC = () => {
-  const [selectedNetwork, setSelectedNetwork] = useState<string | null>(null);
-  const [editingNetworks, setEditingNetworks] = useState<any[]>(mockNetworks); // 使用 mock 数据初始化编辑中的网络
-  const [networks, setNetworks] = useState<any[]>([]); // 已有网络
-  const [showExistingNetworks, setShowExistingNetworks] = useState(true); // 默认显示已有网络
-  const [isCreatingNetwork, setIsCreatingNetwork] = useState(false);
-  const [isModifyingNetwork, setIsModifyingNetwork] = useState(false); // 新增修改模式
+  const dispatch = useAppDispatch();
+
+  const [showExistingNetworks, setShowExistingNetworks] = useState(true);
+  const [isCreatingNetwork, setIsCreatingNetwork] = useState(false); // 控制创建模式
+  const [isModifyingNetwork, setIsModifyingNetwork] = useState(false); // 控制修改模式
   const [networkToModify, setNetworkToModify] = useState<any | null>(null); // 存储要修改的网络信息
-  const [finalizedNetwork, setFinalizedNetwork] = useState<string | null>(null); // 存储已完成的网络名称
-  const [searchTerm, setSearchTerm] = useState<string>("");
+  const [editingSite, setEditingSite] = useState<any | null>(null);  // 控制站点编辑
+  const [siteFormVisible, setSiteFormVisible] = useState(false);  // 控制 SiteForm 可见性
 
-  // Helper function to get the network title from the key
-  const getNetworkTitle = (networkKey: string | null, networks: any[]) => {
-    if (!networkKey) return null;
-    const network = networks.find((n) => n.key === networkKey);
-    return network ? network.title : null;
-    };
+  // 存储选中的网络名称与 ID
+  const [selectedNetwork, setSelectedNetwork] = useState<string | null>(null);
+  const [selectedNetworkName, setSelectedNetworkName] = useState<string | null>(null);
 
-  // 添加调试信息：当选择网络时记录selectedNetwork值
-  console.log("Selected Network:", selectedNetwork);
-  console.log("Finalized Network:", finalizedNetwork);
+  // 从 Redux store 中获取网络数据
+  const networksStats = useSelector((state) => state.networks.data);
+  console.log("Networks Stats:", networksStats);
+  const networkItems = networksStats?.networks || [];
+  console.log("Networks Items:", networkItems);
 
-  // 添加网络
-  const handleAddNetwork = () => {
-    setIsCreatingNetwork(true); // 显示表单
+  // 当用户点击 NetworkInitTree 中的网络时触发
+  const handleSelectNetwork = (network_id: string, network_name: string) => {
+    setSelectedNetwork(network_id);
+    setSelectedNetworkName(network_name);
+    console.log(`Selected network: ${network_id}, name: ${network_name}`);
   };
-
-  // 修改网络名称
-  const handleEditNetwork = (networkKey: string, newName: string, newSites: any[]) => {
-    setEditingNetworks(
-      editingNetworks.map((network) =>
-        network.key === networkKey ? { ...network, title: newName, children: newSites } : network
-      )
-    );
-    setIsModifyingNetwork(false); // 退出修改模式
-    setNetworkToModify(null);
-  };
-
-  // 点击 Modify 按钮，填充表单
-  const openModifyForm = (networkKey: string) => {
-    const network = editingNetworks.find((n) => n.key === networkKey);
-    if (network) {
-      setNetworkToModify(network); // 设置要修改的网络信息
-      setIsModifyingNetwork(true); // 进入修改模式
-    }
-  };
-
+  
   // 提交新建或修改的网络
   const handleSubmitNetwork = (networkData: any) => {
-    if (isModifyingNetwork && networkToModify) {
-      handleEditNetwork(networkToModify.key, networkData.title, networkData.children);
+    
+    console.log("Form submitted with data:", networkData); // 打印提交时的网络数据
+    
+    // 如果是编辑模式，直接调用 newSites
+    if (isModifyingNetwork) {
+      dispatch(updateNetwork(networkData));  // 确保 updateNetwork 能处理 `sites` 字段
     } else {
-      setEditingNetworks([...editingNetworks, networkData]);
+      dispatch(addNetwork(networkData));  // 新增网络
     }
+  
     setIsCreatingNetwork(false);
     setIsModifyingNetwork(false);
   };
 
-  // 删除网络：从 editingNetworks 和 networks 中同时删除
-  const handleDeleteNetwork = (networkKey: string) => {
-    confirm({
+  // 修改网络名称或添加新站点
+  const handleEditNetwork = (network_id: string, newName: string) => {
+    console.log("Edit network triggered for:", network_id); // 打印编辑时的网络信息
+    console.log("New Name:", newName); // 打印新网络名
+
+    // 创建 networkData 对象
+    const networkData = {
+      network_id,
+      network_name: newName,
+    };  
+    setNetworkToModify(networkData); // 将选中的网络数据设置为要修改的内容
+    setIsModifyingNetwork(true);
+  };
+
+  // 关闭 NetworkForm 的方法
+  const closeNetworkForm = () => {
+    setIsCreatingNetwork(false);
+    setIsModifyingNetwork(false);
+    setNetworkToModify(null); // 清除编辑状态
+    console.log("Network form closed, reset state.");
+  };
+
+  // 删除网络的方法
+  const handleDeleteNetwork = (network_id: string) => {
+    const networkToDelete = networkItems.find((network) => network.network_id === network_id);
+
+    Modal.confirm({
       title: "Are you sure you want to delete this network?",
-      content: "This action cannot be undone. Please confirm your decision.",
-      okText: "Yes",
-      cancelText: "No",
-      onOk() {
-        // 执行删除操作
-        setEditingNetworks(editingNetworks.filter((n) => n.key !== networkKey));
-        setNetworks(networks.filter((n) => n.key !== networkKey)); // 同时从 networks 中删除
-        console.log(`Network with key ${networkKey} has been deleted`);
+      content: `Network Name: ${networkToDelete?.network_name}`,
+      okText: "Confirm",
+      cancelText: "Cancel",
+      onOk: async () => {
+        await dispatch(deleteNetwork(network_id));
+        await dispatch(deleteNetworkSummary(network_id));
       },
-      onCancel() {
-        console.log("Deletion cancelled");
-      },
+      onCancel: () => {
+        console.log("Delete action cancelled");
+      }
     });
   };
 
-  // 锁定/解锁网络
-  const handleToggleLock = (networkKey: string) => {
-    setEditingNetworks(
-      editingNetworks.map((network) =>
-        network.key === networkKey
-          ? { ...network, isLocked: !network.isLocked }
-          : network
-      )
-    );
+  const handleSiteFormSubmit = (siteData: any) => {
+    const { network_id, site_id } = editingSite;
+    console.log(`Updating site with site_id: ${site_id}`, siteData);
+    
+    //这里触发 Redux action 来更新站点信息
+    dispatch(updateSite({ site_id, network_id: siteData.network_id, site_name: siteData.site_name, site_location: siteData.site_location }));
+
+    setSiteFormVisible(false);  // 关闭表单
   };
 
-  // 选择网络
-  const handleSelect = (selectedKeys: React.Key[]) => {
-    if (selectedKeys.length) {
-      console.log("Network selected from Tree:", selectedKeys[0]);
-      setSelectedNetwork(selectedKeys[0] as string); // 传递选中的网络key
-      setIsCreatingNetwork(false);
-    }
+  // 处理编辑站点的逻辑
+  const handleEditSite = (site_id: string, site_name: string, site_location: { latitude: string; longitude: string }) => {
+    setEditingSite({ site_id, site_name, site_location });
+    setSiteFormVisible(true);
   };
 
-  // 完成网络创建并将网络移入已有网络
-  const handleFinalizeNetwork = (networkKey: string) => {
-    const network = editingNetworks.find((n) => n.key === networkKey);
-    if (network) {
-      console.log("Finalizing network:", networkKey);
-  
-      // 检查网络是否已存在于 networks 中
-      const existsInNetworks = networks.some((n) => n.key === networkKey);
-  
-      if (!existsInNetworks) {
-        setEditingNetworks(
-          editingNetworks.map((n) =>
-            n.key === networkKey ? { ...n, isLocked: true } : n
-          )
-        );
-        setNetworks([...networks, { ...network, isLocked: true, showLock: false }]);
-        setFinalizedNetwork(networkKey); // 更新已完成的网络 key
-      } else {
-        console.log(`Network with key ${networkKey} already exists in Networks.`);
-      }
-    }
-  };
-
-  // 更新网络修改同步到已有网络
-  const handleUpdateNetwork = (networkKey: string) => {
-    const network = editingNetworks.find((n) => n.key === networkKey);
-    if (network) {
-      console.log("Updating network:", networkKey);
-  
-      // 检查网络是否已存在于 networks 中
-      const existsInNetworks = networks.some((n) => n.key === networkKey);
-  
-      if (existsInNetworks) {
-        // 更新已存在的网络
-        setNetworks(
-          networks.map((n) =>
-            n.key === networkKey ? { ...n, ...network } : n
-          )
-        );
-      } else {
-        // 如果网络不存在，则添加
-        setNetworks([...networks, { ...network, isLocked: true, showLock: false }]);
-      }
-      setFinalizedNetwork(networkKey); // 更新已完成的网络 key
-    }
-  };
-
-  // 搜索逻辑
-  const handleSearch = () => {
-    console.log("Search for", searchTerm);
+  // 删除站点的逻辑，只需要传递 site_id 和 site_name
+  const handleDeleteSite = (site_id: string, site_name: string) => {
+    Modal.confirm({
+      title: `Are you sure you want to delete the site "${site_name}"?`,
+      okText: "Yes",
+      cancelText: "No",
+      onOk: () => {
+        dispatch(deleteSite({ site_id })); // 只传递 site_id
+      },
+    });
   };
 
   return (
@@ -166,123 +132,49 @@ export const NetworkPage: React.FC = () => {
       <Layout className={styles.container}>
         <Sider className={styles.sidebar} width={"auto"}>
           <Title level={5} className={styles.sidebarTitle}>
-            Network Control Panel
+            Networks Control Panel
           </Title>
-          <Space>
+          <Space className={styles.sidebarButton}>
+            {/* 切换状态显示 NetworkInitTree 或 NetworksTree */}
             <Button
               type={!showExistingNetworks ? "primary" : "default"}
-              onClick={() => {
-                setShowExistingNetworks(false);
-                setSelectedNetwork(null); // 清空选择的网络
-                console.log("Switched to Edit Network view.");
-              }}
+              onClick={() => setShowExistingNetworks(false)} 
             >
-              Edit Network
+              Edit
             </Button>
             <Button
               type={showExistingNetworks ? "primary" : "default"}
-              onClick={() => {
-                setShowExistingNetworks(true);
-                setSelectedNetwork(null); // 清空选择的网络
-                setIsCreatingNetwork(false);
-                setIsModifyingNetwork(false);
-                console.log("Switched to Networks view.");
-              }}
+              onClick={() => setShowExistingNetworks(true)} 
             >
-              Networks
+              Management
             </Button>
-          </Space>
-
-          {/* 只有在 Edit Network 模式下才显示 Add Network 和 Search */}
-          {!showExistingNetworks && (
-            <div style={{ marginTop: "20px" }}>
-              {/* Add Network 按钮 */}
-              <Button
-                type="primary"
-                onClick={handleAddNetwork}
-                block
-                style={{ marginBottom: "10px" }}
-              >
-                Add Network
-              </Button>
-
-              {/* 搜索栏和搜索按钮 */}
-              <Space style={{ display: "flex", marginBottom: "20px" }}>
-                <Input
-                  placeholder="Search by network, site, or NE"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-                <Button type="default" onClick={handleSearch}>
-                  Search
-                </Button>
-              </Space>
-            </div>
-          )}
-
-          {/* 根据选择显示不同的树形结构 */}
-          <Tree
-            className={styles.networkTree}
-            treeData={showExistingNetworks ? networks : editingNetworks}
-            onSelect={handleSelect}
-            titleRender={(nodeData) => (
-              <div className={styles.treeNode}>
-                <span>{nodeData.title}</span>
-                {!nodeData.isLocked && !showExistingNetworks && (
-                  <>
-                    <Button
-                      size="small"
-                      onClick={() => openModifyForm(nodeData.key)} // 打开修改表单
-                    >
-                      Modify
-                    </Button>
-                    <Button
-                      size="small"
-                      danger
-                      onClick={() => handleDeleteNetwork(nodeData.key)}
-                    >
-                      Delete
-                    </Button>
-                  </>
-                )}
-                {!showExistingNetworks && (
-                  <Button
-                    size="small"
-                    onClick={() => handleToggleLock(nodeData.key)}
-                  >
-                    {nodeData.isLocked ? "Unlock" : "Lock"}
-                  </Button>
-                )}
-              </div>
-            )}
-          />
-        </Sider>
-
+          </Space> 
+          {/* 根据状态显示不同的 Tree 组件 */}
+          <Content className={styles.content}>
+            <NetworkInitTree
+              networkItems={networkItems} 
+              onSelectNetwork={handleSelectNetwork}
+              onAddNetwork={() => setIsCreatingNetwork(true)}  // 调用此方法以开始创建网络
+              onEditNetwork={handleEditNetwork} 
+              onDeleteNetwork={handleDeleteNetwork} 
+              onEditSite={handleEditSite}
+              onDeleteSite={handleDeleteSite}
+            />
+          </Content>
+        </Sider> 
         <Content className={styles.content}>
-          {isCreatingNetwork || isModifyingNetwork ? (
-            <NetworkForm
-            onSubmit={handleSubmitNetwork}
-            initialValues={networkToModify} // 如果在修改模式下，传递初始值
-          />
-        ) : selectedNetwork ? (
-          !showExistingNetworks ? (
-            <NetworkInitializationPanel
-                networkName={getNetworkTitle(selectedNetwork, editingNetworks) || ""}
-                onFinalize={() => handleFinalizeNetwork(selectedNetwork)}
-                onUpdate={() => handleUpdateNetwork(selectedNetwork)} // 将同步逻辑连接到 Update 按钮
+          {selectedNetwork ? (
+            <NetworkInitPanel
+              networkName={selectedNetworkName || "Unnamed Network"}
+              networkId= {selectedNetwork}
+              onFinalize={() => console.log("Network finalized")}
+              onUpdate={() => console.log("Network updated")}
             />
             ) : (
-              <>
-                <NetworkManagementPanel
-                  networkName={
-                    getNetworkTitle(finalizedNetwork, networks) ||
-                    getNetworkTitle(selectedNetwork, editingNetworks)
-                  } // 使用网络名称而非key
-                />
-                <TopoView />
-              </>
-            )
-          ) : (
+              <div className={styles.placeholder}>
+                <Title level={4}>Please select a network for initialization</Title>
+              </div>
+            )}
             <div className={styles.placeholder}>
               <Title level={4}>
                 {showExistingNetworks
@@ -290,9 +182,24 @@ export const NetworkPage: React.FC = () => {
                   : "Please select a network for initialization"}
               </Title>
             </div>
-          )}
         </Content>
       </Layout>
+
+      {/* 渲染独立的 NetworkForm */}
+      <NetworkForm
+        onClose={closeNetworkForm}
+        onSubmit={handleSubmitNetwork}
+        initialValues={networkToModify}  // 编辑模式时，传递初始值
+        visible={isCreatingNetwork || isModifyingNetwork}
+      />
+
+      {/* 渲染 SiteForm 表单 */}
+      <SiteForm
+        visible={siteFormVisible}
+        onClose={() => setSiteFormVisible(false)}
+        onSubmit={handleSiteFormSubmit}
+        initialValues={editingSite}
+      />
     </MainLayout>
   );
 };
