@@ -29,11 +29,11 @@ def get_info(ne_name):
     # 规范化设备的 SNMP 配置信息，兼容前端传入的参数
     device = {
         'ip': data['ne_ip'],  # 将前端的 ne_ip 映射为后端期望的 ip
-        'snmp_username': data['snmp_username'],
-        'snmp_auth_protocol': data['snmp_auth_protocol'],
-        'snmp_auth_password': data['snmp_auth_password'],
-        'snmp_priv_protocol': data['snmp_priv_protocol'],
-        'snmp_priv_password': data['snmp_priv_password']
+        'username': data['snmp_username'],
+        'auth_protocol': data['snmp_auth_protocol'],
+        'auth_password': data['snmp_auth_password'],
+        'priv_protocol': data['snmp_priv_protocol'],
+        'priv_password': data['snmp_priv_password']
     }
 
     try:

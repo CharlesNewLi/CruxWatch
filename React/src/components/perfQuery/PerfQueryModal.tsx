@@ -21,8 +21,6 @@ export const PerfQueryModal: React.FC<PerfQueryModalProps> = ({ visible, selecte
   useEffect(() => {
     if (visible && selectedDevice) {
       form.setFieldsValue({
-        ne_type: selectedDevice.ne_type || 'Router',
-        ne_make: selectedDevice.ne_make || '',
         ne_ip: selectedDevice.ne_ip || '',
         snmp_username: selectedDevice.snmp_username || '',
         snmp_auth_protocol: selectedDevice.snmp_auth_protocol || '',
@@ -143,16 +141,6 @@ export const PerfQueryModal: React.FC<PerfQueryModalProps> = ({ visible, selecte
         initialValues={{ ne_type: 'Router', snmp_username: 'admin', snmp_auth_password: 'password123' }}
         style={{ display: 'flex', justifyContent: 'space-between' }}
       >
-        <Form.Item name="ne_type" label="NE Type">
-          <Select onChange={(value) => form.setFieldsValue({ ne_type: value })} style={{ width: 150 }}>
-            <Option value="Router">Router</Option>
-            <Option value="Switch">Switch</Option>
-            <Option value="Firewall">Firewall</Option>
-          </Select>
-        </Form.Item>
-        <Form.Item name="ne_make" label="NE Make">
-          <Input placeholder="NE Make" style={{ width: 150 }} />
-        </Form.Item>
         <Form.Item name="ne_ip" label="NE IP">
           <Input placeholder="NE IP" style={{ width: 150 }} />
         </Form.Item>
