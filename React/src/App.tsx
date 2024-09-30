@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useAppDispatch, useSelector } from "./redux/hooks"; 
+import { useAppDispatch } from "./redux/hooks"; 
 import { getNetworks, syncNetworkStats } from "./redux/networks/slice"; 
 import styles from "./App.module.css";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
