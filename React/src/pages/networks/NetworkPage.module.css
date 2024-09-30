@@ -1,14 +1,14 @@
 .container {
   display: flex;
+  width: 1500px;
   height: calc(100vh - 100px); /* 让页面占满可视区域 */
-  margin-top: 2%;
 }
 
 .sidebar {
   flex: 1; /* 自动调整宽度的侧边栏 */
-  max-width: 350px; /* 可设定最大宽度 */
+  width: 15% !important; /* 可设定最大宽度 */
   background-color: #ffffff !important;
-  padding: 20px;
+  padding: 1%;
   border-right: 2px solid #e0e0e0; /* 添加分隔线 */
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); /* 侧边栏阴影效果 */
 }
@@ -27,14 +27,11 @@
 }
 
 .networkTree {
-  margin-top: 20px;
   border-top: 1px solid #e0e0e0; /* 树结构上方添加分隔线 */
-  padding-top: 10px;
+  padding-top: 1%;
 }
 
 .content {
-  flex: 3; /* 动态调整宽度的内容区域 */
-  background-color: #ffffff;
-  border-radius: 8px; /* 让右侧区域有圆角 */
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); /* 右侧区域阴影 */
+  flex: auto;
+  width: 98%;
 }

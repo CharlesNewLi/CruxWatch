@@ -1,16 +1,12 @@
 import logging
 import socket
-from netmiko import ConnectHandler
 from pysnmp.hlapi import *
 from cachetools import cached, TTLCache
 
-# Cache configuration: max size of 100, TTL (time-to-live) of 300 seconds (5 minutes)
+# 设置缓存，大小为100，缓存时间300秒
 cache = TTLCache(maxsize=100, ttl=300)
 
-# Store discovered devices, including GNE and its neighbors
-devices = {}
-
-# Validate IP addresses
+# 验证IP地址格式
 def is_valid_ip(ip):
     try:
         socket.inet_aton(ip)
@@ -18,127 +14,179 @@ def is_valid_ip(ip):
     except socket.error:
         return False
 
-# Filter out SSH-related parameters from the device info
-def filter_ssh_params(device_info):
-    allowed_keys = ['device_type', 'ip', 'username', 'password', 'secret', 'verbose', 'global_delay_factor', 'session_log']
-    ssh_params = {}
-    
-    for key in allowed_keys:
-        if key in device_info:
-            ssh_params[key] = device_info[key]
-        ssh_key = f'ssh_{key}'
-        if ssh_key in device_info:
-            ssh_params[key] = device_info[ssh_key]
-    
-    return ssh_params
-
-# Filter out SNMP-related parameters from the device info
+# 过滤出 SNMP 相关的参数
 def filter_snmp_params(device_info):
     allowed_keys = ['ip', 'username', 'auth_protocol', 'auth_password', 'priv_protocol', 'priv_password']
     snmp_params = {}
-
-    # 检查 allowed_keys 中的键，确保 IP 地址等关键参数不会被过滤掉
+    
     for key in allowed_keys:
         if key in device_info:
             snmp_params[key] = device_info[key]
         snmp_key = f'snmp_{key}'
         if snmp_key in device_info:
             snmp_params[key] = device_info[snmp_key]
-
+    
     return snmp_params
 
-# Fetch SNMP data
+# 获取 SNMP v3 数据
 @cached(cache, key=lambda device: device['ip'])
 def get_snmpv3_data(device):
     snmp_params = filter_snmp_params(device)
     auth_protocol = usmHMACSHAAuthProtocol if snmp_params.get('auth_protocol') == 'SHA' else usmHMACMD5AuthProtocol
-    priv_protocol = usmAesCfb128Protocol if snmp_params.get('priv_protocol') == 'AES128' else usmDESPrivProtocol
+    priv_protocol_input = snmp_params.get('priv_protocol')
     
-    data = {}
+    if priv_protocol_input == 'AES128':
+        priv_protocol = usmAesCfb128Protocol
+    elif priv_protocol_input in ['DES56', 'DES']:
+        priv_protocol = usmDESPrivProtocol
+    else:
+        raise ValueError(f"Unsupported privacy protocol: {priv_protocol_input}")
+    
+    ne_node = {}
 
-    def fetch_oid(oid, label):
+    # 定义针对不同设备类型的处理函数
+    device_type = device.get('device_type', 'cisco_ios')  # 默认值为 cisco_ios
+    if device_type == 'huawei':
+        fetch_oid = lambda oid, label: fetch_oid_huawei(snmp_params, oid, label, ne_node)
+    elif device_type == 'cisco_ios':
+        fetch_oid = lambda oid, label: fetch_oid_cisco(snmp_params, oid, label, ne_node)
+
+    # 获取基本设备信息 (sysName, sysDescr)
+    fetch_oid('1.3.6.1.2.1.1.5.0', 'Device Name')  # sysName
+    fetch_oid('1.3.6.1.2.1.1.1.0', 'Device Version')  # sysDescr
+    
+    # 获取设备接口信息
+    ne_node['Interfaces'] = []
+    interface_indexes = {}
+
+    # 获取接口索引、描述和状态
+    iterator = nextCmd(
+        SnmpEngine(),
+        UsmUserData(snmp_params['username'], snmp_params['auth_password'], snmp_params['priv_password'],
+                    authProtocol=auth_protocol, privProtocol=priv_protocol),
+        UdpTransportTarget((snmp_params['ip'], 161), timeout=15.0, retries=10),  # 增加超时时间和重试次数
+        ContextData(),
+        ObjectType(ObjectIdentity('1.3.6.1.2.1.2.2.1.1')),  # ifIndex 接口索引
+        ObjectType(ObjectIdentity('1.3.6.1.2.1.2.2.1.2')),  # ifDescr 接口描述
+        ObjectType(ObjectIdentity('1.3.6.1.2.1.2.2.1.8')),  # ifOperStatus 接口状态
+        lexicographicMode=False
+    )
+
+    for errorIndication, errorStatus, errorIndex, varBinds in iterator:
+        if errorIndication:
+            logging.error(f"Error indication: {errorIndication}")
+            break
+        elif errorStatus:
+            logging.error(f"Error status: {errorStatus.prettyPrint()}")
+            break
+
+        if_index = str(varBinds[0][1])  # 接口索引
+        interface_info = {
+            'Index': if_index,  # 接口索引
+            'Description': str(varBinds[1][1]),  # 接口名称
+            'Status': str(varBinds[2][1]),  # 接口状态
+            'IP Address': None  # 占位符，稍后获取IP地址
+        }
+        ne_node['Interfaces'].append(interface_info)
+        interface_indexes[if_index] = interface_info  # 存储接口索引以便后续查找
+
+    # 获取每个接口的IP地址
+    ip_iterator = nextCmd(
+        SnmpEngine(),
+        UsmUserData(snmp_params['username'], snmp_params['auth_password'], snmp_params['priv_password'],
+                    authProtocol=auth_protocol, privProtocol=priv_protocol),
+        UdpTransportTarget((snmp_params['ip'], 161), timeout=15.0, retries=10),  # 增加超时时间和重试次数
+        ContextData(),
+        ObjectType(ObjectIdentity('1.3.6.1.2.1.4.20.1.2')),  # ipAdEntIfIndex 表示哪个接口有此IP
+        ObjectType(ObjectIdentity('1.3.6.1.2.1.4.20.1.1')),  # ipAdEntAddr 对应的IP地址
+        lexicographicMode=False
+    )
+
+    for errorIndication, errorStatus, errorIndex, varBinds in ip_iterator:
+        if errorIndication:
+            logging.error(f"Error indication: {errorIndication}")
+            break
+        elif errorStatus:
+            logging.error(f"Error status: {errorStatus.prettyPrint()}")
+            break
+
+        ip_if_index = str(varBinds[0][1])  # 与接口匹配的索引
+        raw_ip_address = varBinds[1][1]  # IP地址 (raw bytes)
+        try:
+            ip_address = socket.inet_ntoa(raw_ip_address.asOctets())  # 将原始字节转换为标准IP
+        except Exception as e:
+            logging.error(f"Failed to convert IP address: {e}")
+            ip_address = None
+
+        if ip_if_index in interface_indexes:
+            interface_indexes[ip_if_index]['IP Address'] = ip_address
+
+    return ne_node
+
+# Huawei设备的OID获取函数，增加超时和重试
+# Huawei设备的OID获取函数，增加超时和重试
+def fetch_oid_huawei(snmp_params, oid, label, ne_node):
+    """ Huawei设备专用的fetch_oid逻辑 """
+    try:
         iterator = getCmd(
             SnmpEngine(),
             UsmUserData(snmp_params['username'], snmp_params['auth_password'], snmp_params['priv_password'],
-                        authProtocol=auth_protocol,
-                        privProtocol=priv_protocol),
-            UdpTransportTarget((snmp_params['ip'], 161), timeout=10.0, retries=5),
+                        authProtocol=usmHMACSHAAuthProtocol, privProtocol=usmAesCfb128Protocol),
+            UdpTransportTarget((snmp_params['ip'], 161), timeout=15.0, retries=10),  # 增加超时时间和重试次数
             ContextData(),
             ObjectType(ObjectIdentity(oid))
         )
         errorIndication, errorStatus, errorIndex, varBinds = next(iterator)
         if errorIndication:
-            data[label] = str(errorIndication)
+            logging.error(f"SNMP error for OID {oid}: {errorIndication}")
+            ne_node[label] = str(errorIndication)
         elif errorStatus:
-            data[label] = f'{errorStatus.prettyPrint()} at {errorIndex and varBinds[int(errorIndex)-1][0] or "?"}'
+            logging.error(f"SNMP error status for OID {oid}: {errorStatus.prettyPrint()}")
+            ne_node[label] = f"{errorStatus.prettyPrint()} at {errorIndex and varBinds[int(errorIndex)-1][0] or '?'}"
         else:
-            data[label] = str(varBinds[0][1])
-
-    fetch_oid('1.3.6.1.2.1.1.5.0', 'Device Name')  # sysName
-    fetch_oid('1.3.6.1.2.1.1.1.0', 'Device Version')  # sysDescr
-    fetch_oid('1.3.6.1.2.1.25.3.3.1.2.1', 'CPU Metrics')  # hrProcessorLoad
-    fetch_oid('1.3.6.1.2.1.25.2.3.1.6.1', 'Storage Metrics')  # hrStorageUsed
-    fetch_oid('1.3.6.1.2.1.2.1.0', 'Number of Interfaces')  # ifNumber
-
-    return data
-
-# Query device via GNE as a gateway
-def query_device_via_gateway(gne_device, target_device, command):
-    try:
-        # Print the GNE value for the target device
-        logging.debug(f"Target device {target_device['device_name']} GNE value: {target_device.get('gne')}")
-
-        # Check if the GNE device exists
-        gne_ip = target_device.get('gne')
-        gne_device_name = None
-        for device_name, device in devices.items():
-            if device['ip'] == gne_ip:
-                gne_device_name = device_name
-                break
-
-        if not gne_device_name:
-            logging.error(f"GNE device not found in devices dictionary for IP: {gne_ip}")
-            return {'status': 'failure', 'error': f'GNE device not found for IP: {gne_ip}'}
-        else:
-            logging.debug(f"Found GNE device: {gne_device_name} for IP: {gne_ip}")
-            gne_device = devices[gne_device_name]  # Retrieve GNE device by name
-
-        log_connection_attempt(gne_device)
-        gne_params = filter_ssh_params(gne_device)
-        target_params = filter_ssh_params(target_device)
-
-        if gne_device['ip'] != target_device['ip']:
-            connection = ConnectHandler(**gne_params)
-            if 'secret' in gne_device:
-                connection.enable()
-
-            # Connect to the neighbor device via GNE
-            stelnet_command = f"stelnet {target_device['ip']}"
-            command_output = connection.send_command_timing(stelnet_command)
-
-            if 'The server is not authenticated' in command_output:
-                command_output += connection.send_command_timing('Y')
-                command_output += connection.send_command_timing('Y')
-
-            command_output += connection.send_command_timing(target_device['ssh_username'])
-            command_output += connection.send_command_timing(target_device['ssh_password'])
-
-            if 'Change now? [Y/N]' in command_output:
-                command_output += connection.send_command_timing('N')
-
-            connection.send_command('screen-length 0 temporary')
-        else:
-            connection = ConnectHandler(**target_params)
-            command_output = ""
-
-        # Use a general prompt regex pattern to match all device prompts
-        command_output += connection.send_command(command, expect_string=r'[>#]', read_timeout=20)
-
-        connection.send_command_timing('quit')
-        connection.disconnect()
-
-        return {'status': 'success', 'output': command_output}
-
+            ne_node[label] = str(varBinds[0][1])
     except Exception as e:
-        logging.error(f"Error during SSH connection: {str(e)}")
-        return {'status': 'failure', 'error': str(e)}
+        logging.error(f"Exception while fetching OID {oid}: {e}")
+        ne_node[label] = f"Exception: {e}"
+
+# Cisco设备的OID获取函数
+def fetch_oid_cisco(snmp_params, oid, label, ne_node):
+    """ Cisco设备专用的fetch_oid逻辑 """
+    iterator = getCmd(
+        SnmpEngine(),
+        UsmUserData(snmp_params['username'], snmp_params['auth_password'], snmp_params['priv_password'],
+                    authProtocol=usmHMACMD5AuthProtocol, privProtocol=usmDESPrivProtocol),
+        UdpTransportTarget((snmp_params['ip'], 161), timeout=10.0, retries=5),
+        ContextData(),
+        ObjectType(ObjectIdentity(oid))
+    )
+    errorIndication, errorStatus, errorIndex, varBinds = next(iterator)
+    if errorIndication:
+        logging.error(f"SNMP error for OID {oid}: {errorIndication}")
+        ne_node[label] = str(errorIndication)
+    elif errorStatus:
+        logging.error(f"SNMP error status for OID {oid}: {errorStatus.prettyPrint()}")
+        ne_node[label] = f"{errorStatus.prettyPrint()} at {errorIndex and varBinds[int(errorIndex)-1][0] or '?'}"
+    else:
+        ne_node[label] = str(varBinds[0][1])
+
+# Cisco设备的OID获取函数
+def fetch_oid_cisco(snmp_params, oid, label, ne_node):
+    """ Cisco设备专用的fetch_oid逻辑 """
+    iterator = getCmd(
+        SnmpEngine(),
+        UsmUserData(snmp_params['username'], snmp_params['auth_password'], snmp_params['priv_password'],
+                    authProtocol=usmHMACMD5AuthProtocol, privProtocol=usmDESPrivProtocol),
+        UdpTransportTarget((snmp_params['ip'], 161), timeout=10.0, retries=5),
+        ContextData(),
+        ObjectType(ObjectIdentity(oid))
+    )
+    errorIndication, errorStatus, errorIndex, varBinds = next(iterator)
+    if errorIndication:
+        logging.error(f"SNMP error for OID {oid}: {errorIndication}")
+        ne_node[label] = str(errorIndication)
+    elif errorStatus:
+        logging.error(f"SNMP error status for OID {oid}: {errorStatus.prettyPrint()}")
+        ne_node[label] = f"{errorStatus.prettyPrint()} at {errorIndex and varBinds[int(errorIndex)-1][0] or '?'}"
+    else:
+        ne_node[label] = str(varBinds[0][1])

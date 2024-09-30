@@ -1,15 +1,17 @@
 import React, { useState } from "react";
-import { Button, Input, Select, Form, Space, Modal, Typography } from "antd";
+import { Button, Input, Select, Form, Space, Typography } from "antd";
 import styles from "./NetworkInitPanel.module.css"; // 定义样式
 
 const { Option } = Select;
 const { Title } = Typography;
 
 interface ElementFormProps {
-  onSubmit: (neData: any) => Promise<any>; // 返回 Promise 以等待后端响应
+  onSSHSubmit: (neData: any) => Promise<any>; // 返回 Promise 以等待后端响应
+  onSNMPSubmit: (neData: any) => Promise<any>;
+  onDiscoverNeighbors: (neData: any) => Promise<any>; // 可选的发现邻居按钮处理函数
 }
 
-export const ElementForm: React.FC<ElementFormProps> = ({ onSubmit }) => {
+export const ElementForm: React.FC<ElementFormProps> = ({ onSSHSubmit, onSNMPSubmit, onDiscoverNeighbors }) => {
   const [neData, setNeData] = useState({
     neName: "",
     neType: "",
@@ -18,35 +20,96 @@ export const ElementForm: React.FC<ElementFormProps> = ({ onSubmit }) => {
     sshUsername: "",
     sshPassword: "",
     sshSecret: "",
+    snmpUsername: "",
+    snmpAuthPassword: "",
+    snmpAuthProtocol: "",
+    snmpPrivPassword: "",
+    snmpPrivProtocol: ""
   });
 
-  const [isSnmpConfigVisible, setIsSnmpConfigVisible] = useState(false);
   const [isDeviceAdded, setIsDeviceAdded] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string>(""); // 添加错误消息的状态
+  const [isSNMPConfigured, setIsSNMPConfigured] = useState(false); // 用于跟踪 SNMP 配置状态
+  const [successMessage, setSuccessMessage] = useState<string>(""); // 用于显示成功消息
+  const [errorMessage, setErrorMessage] = useState<string>("");
 
-  const handleSubmit = async () => {
+  // 处理 SSH 提交
+  const handleSSHSubmit = async () => {
     console.log("Form data being submitted: ", neData); // 打印当前表单数据
-  
+
     if (neData.neName && neData.neIpAddress) {
       try {
-        const response = await onSubmit(neData); // 等待后端响应
-        if (response.status === 'success') {
-          setIsDeviceAdded(true); // 模拟设备添加成功
-          setIsSnmpConfigVisible(true); // 如果成功，显示SNMP配置弹窗
-          setErrorMessage(""); // 清除之前的错误信息
+        const response = await onSSHSubmit(neData); // 等待后端响应
+        console.log("Response from backend: ", response); // 打印后端响应
+
+        // 检查返回的数据是否包含有效设备信息
+        if (response && response.ne_name) {
+          setIsDeviceAdded(true); // 设备成功添加
+          setSuccessMessage("SSH connection successful."); // 设置成功消息
+          setErrorMessage(""); // 清除错误消息
         } else {
-          setErrorMessage(response.error || "Device addition failed."); // 显示错误信息
+          setErrorMessage("Device addition failed."); // 如果没有返回有效设备信息，显示错误消息
         }
       } catch (error: any) {
-        // 捕获异常，并设置错误消息
-        if (error.response && error.response.data && error.response.data.error) {
-          setErrorMessage(error.response.data.error); // 使用后端返回的错误信息
-        } else {
-          setErrorMessage("An error occurred while adding the device.");
-        }
+        console.error("Error during SSH submission:", error);
+        setErrorMessage("An error occurred while adding the device."); // 捕获异常并显示错误消息
       }
     } else {
-      setErrorMessage("Please fill in all required fields.");
+      setErrorMessage("Please fill in all required fields."); // 显示字段未填写错误
+    }
+  };
+
+  // 处理 SNMP 提交
+  const handleSNMPSubmit = async () => {
+    console.log("SNMP Configuration Submitted: ", neData);
+
+    try {
+      const response = await onSNMPSubmit(neData); // 传递完整的 neData 进行 SNMP 配置
+      console.log("Response from backend with SNMP: ", response); // 打印后端响应
+      
+      if (response && response.status === 'success') {
+        setIsSNMPConfigured(true); // 标记 SNMP 配置成功
+        setSuccessMessage("SNMP setup successful.");
+        setErrorMessage(""); // 清除之前的错误信息
+      } else {
+        setErrorMessage(response.message || "SNMP setup failed.");
+      }
+    } catch (error: any) {
+      console.error("Error during SNMP setup: ", error);
+      setErrorMessage("An error occurred during SNMP setup.");
+    }
+  };
+
+  // 处理 Discover Neighbor 按钮
+  const handleDiscoverNeighbors = async () => {
+    if (onDiscoverNeighbors && isSNMPConfigured) {
+      try {
+        // 打印传递给 onDiscoverNeighbors 的数据
+        console.log("Sending data to neighbor discovery:", neData);
+        
+        const response = await onDiscoverNeighbors(neData); // 将所有的 neData 传递给邻居发现函数
+        
+        // 打印从 onDiscoverNeighbors 返回的响应
+        console.log("Discover neighbors response:", response);
+
+        // 检查后端返回的状态
+        if (response && response.status === "success") {
+          setSuccessMessage("Neighbor discovery successful.");
+          setErrorMessage(""); // 清除错误信息
+
+          // 进一步打印返回的数据结构
+          console.log("Discovered devices:", response.elements);
+          console.log("Updated topology:", response.topology);
+        } else {
+          // 打印出错误信息，帮助了解问题原因
+          console.error("Neighbor discovery failed. Response:", response);
+          setErrorMessage(response?.message || "Failed to discover neighbors.");
+        }
+      } catch (error) {
+        console.error("Error during neighbor discovery:", error);
+        setErrorMessage("Neighbor discovery failed.");
+      }
+    } else {
+      setErrorMessage("SNMP is not configured yet.");
     }
   };
 
@@ -59,20 +122,12 @@ export const ElementForm: React.FC<ElementFormProps> = ({ onSubmit }) => {
     setNeData({ ...neData, [fieldName]: value });
   };
 
-  const handleSnmpSubmit = (values: any) => {
-    console.log("SNMP Configuration Submitted: ", values);
-    setIsSnmpConfigVisible(false); // 关闭SNMP配置表单
-  };
-
-  const handleSnmpCancel = () => {
-    setIsSnmpConfigVisible(false); // 关闭SNMP配置表单
-  };
-
   return (
     <>
-      <Form onFinish={handleSubmit} className={styles.ElementForm}>
+      {/* Add NE Form */}
+      <Form onFinish={handleSSHSubmit} className={styles.ElementForm}>
         <Title level={4}>Add GNE</Title>
-        <Space direction="vertical" size="large" className={styles.space}>
+        <Space size="large" className={styles.fullWidthSpace}>
           <Form.Item
             name="neName"
             rules={[{ required: true, message: "Please input NE Name!" }]}
@@ -84,12 +139,6 @@ export const ElementForm: React.FC<ElementFormProps> = ({ onSubmit }) => {
               onChange={handleInputChange}
             />
           </Form.Item>
-          {errorMessage && (
-            <div className={styles.error}>
-              <Typography.Text type="danger">{errorMessage}</Typography.Text>
-            </div>
-          )}
-
           <Form.Item
             name="neType"
             rules={[{ required: true, message: "Please select NE Type!" }]}
@@ -103,7 +152,6 @@ export const ElementForm: React.FC<ElementFormProps> = ({ onSubmit }) => {
               <Option value="Firewall">Firewall</Option>
             </Select>
           </Form.Item>
-
           <Form.Item
             name="neMake"
             rules={[{ required: true, message: "Please input NE Make!" }]}
@@ -115,7 +163,6 @@ export const ElementForm: React.FC<ElementFormProps> = ({ onSubmit }) => {
               onChange={handleInputChange}
             />
           </Form.Item>
-
           <Form.Item
             name="neIpAddress"
             rules={[{ required: true, message: "Please input NE IP Address!" }]}
@@ -127,7 +174,6 @@ export const ElementForm: React.FC<ElementFormProps> = ({ onSubmit }) => {
               onChange={handleInputChange}
             />
           </Form.Item>
-
           <Form.Item
             name="sshUsername"
             rules={[{ required: true, message: "Please input SSH User Name!" }]}
@@ -139,7 +185,6 @@ export const ElementForm: React.FC<ElementFormProps> = ({ onSubmit }) => {
               onChange={handleInputChange}
             />
           </Form.Item>
-
           <Form.Item
             name="sshPassword"
             rules={[{ required: true, message: "Please input SSH Password!" }]}
@@ -151,7 +196,6 @@ export const ElementForm: React.FC<ElementFormProps> = ({ onSubmit }) => {
               onChange={handleInputChange}
             />
           </Form.Item>
-
           <Form.Item name="sshSecret">
             <Input.Password
               name="sshSecret"
@@ -160,7 +204,7 @@ export const ElementForm: React.FC<ElementFormProps> = ({ onSubmit }) => {
               onChange={handleInputChange}
             />
           </Form.Item>
-
+          {/* Add NE 按钮 */}
           <Button type="primary" htmlType="submit">
             Add NE
           </Button>
@@ -168,82 +212,84 @@ export const ElementForm: React.FC<ElementFormProps> = ({ onSubmit }) => {
       </Form>
 
       {isDeviceAdded && (
-        <div className={styles.deviceAdded}>
-          <Title level={5}>Device Added Successfully!</Title>
-          <p>
-            <strong>NE Name:</strong> {neData.neName}
-          </p>
-          <p>
-            <strong>IP Address:</strong> {neData.neIpAddress}
-          </p>
-        </div>
+        <>
+          {/* SNMP 配置表单 */}
+          <Title level={4}>Configure SNMP</Title>
+          <Space size="large" className={styles.fullWidthSpace}>
+            <Form.Item
+              name="snmpUsername"
+              rules={[{ required: true, message: "Please input SNMP Username!" }]}
+            >
+              <Input
+                name="snmpUsername"
+                value={neData.snmpUsername}
+                onChange={handleInputChange}
+                placeholder="SNMP Username"
+              />
+            </Form.Item>
+            <Form.Item
+              name="snmpAuthProtocol"
+              rules={[{ required: true, message: "Please select SNMP Auth Protocol!" }]}
+            >
+              <Select
+                value={neData.snmpAuthProtocol}
+                onChange={(value) => handleSelectChange(value, "snmpAuthProtocol")}
+                placeholder="SNMP Auth Protocol"
+              >
+                <Option value="MD5">MD5</Option>
+                <Option value="SHA">SHA</Option>
+              </Select>
+            </Form.Item>
+            <Form.Item
+              name="snmpAuthPassword"
+              rules={[{ required: true, message: "Please input SNMP Auth Password!" }]}
+            >
+              <Input.Password
+                name="snmpAuthPassword"
+                value={neData.snmpAuthPassword}
+                onChange={handleInputChange}
+                placeholder="SNMP Auth Password"
+              />
+            </Form.Item>
+            <Form.Item
+              name="snmpPrivProtocol"
+              rules={[{ required: true, message: "Please select SNMP Priv Protocol!" }]}
+            >
+              <Select
+                value={neData.snmpPrivProtocol}
+                onChange={(value) => handleSelectChange(value, "snmpPrivProtocol")}
+                placeholder="SNMP Priv Protocol"
+              >
+                <Option value="AES128">AES</Option>
+                <Option value="DES56">DES</Option>
+              </Select>
+            </Form.Item>
+            <Form.Item
+              name="snmpPrivPassword"
+              rules={[{ required: true, message: "Please input SNMP Priv Password!" }]}
+            >
+              <Input.Password
+                name="snmpPrivPassword"
+                value={neData.snmpPrivPassword}
+                onChange={handleInputChange}
+                placeholder="SNMP Priv Password"
+              />
+            </Form.Item>
+            <Button type="primary" htmlType="submit" onClick={handleSNMPSubmit}>
+              Submit SNMP
+            </Button>
+          </Space>
+          {isSNMPConfigured && (
+            <Button type="default" onClick={handleDiscoverNeighbors}>
+              Discover Neighbor
+            </Button>
+          )}
+        </>
       )}
 
-      {/* SNMP 配置表单 */}
-      <Modal
-        title="Configure SNMP"
-        visible={isSnmpConfigVisible}
-        onCancel={handleSnmpCancel}
-        footer={null}
-      >
-        <Form onFinish={handleSnmpSubmit}>
-          <Form.Item
-            name="snmpUsername"
-            label="SNMP Username"
-            rules={[{ required: true, message: "Please input SNMP Username!" }]}
-          >
-            <Input />
-          </Form.Item>
-          <Form.Item
-            name="snmpAuthProtocol"
-            label="SNMP Auth Protocol"
-            rules={[
-              { required: true, message: "Please select SNMP Auth Protocol!" },
-            ]}
-          >
-            <Select>
-              <Option value="MD5">MD5</Option>
-              <Option value="SHA">SHA</Option>
-            </Select>
-          </Form.Item>
-          <Form.Item
-            name="snmpAuthPassword"
-            label="SNMP Auth Password"
-            rules={[
-              { required: true, message: "Please input SNMP Auth Password!" },
-            ]}
-          >
-            <Input.Password />
-          </Form.Item>
-          <Form.Item
-            name="snmpPrivProtocol"
-            label="SNMP Priv Protocol"
-            rules={[
-              { required: true, message: "Please select SNMP Priv Protocol!" },
-            ]}
-          >
-            <Select>
-              <Option value="DES">DES</Option>
-              <Option value="AES">AES</Option>
-            </Select>
-          </Form.Item>
-          <Form.Item
-            name="snmpPrivPassword"
-            label="SNMP Priv Password"
-            rules={[
-              { required: true, message: "Please input SNMP Priv Password!" },
-            ]}
-          >
-            <Input.Password />
-          </Form.Item>
-          <Space>
-            <Button type="primary" htmlType="submit">
-              Submit
-            </Button>
-            <Button onClick={handleSnmpCancel}>Cancel</Button>
-          </Space>
-        </Form>
-      </Modal>
+      {/* 显示成功或错误消息 */}
+      {successMessage && <p style={{ color: 'green' }}>{successMessage}</p>}
+      {errorMessage && <p style={{ color: 'red' }}>{errorMessage}</p>}
     </>
   );
 };

@@ -1,6 +1,6 @@
-// networks/slice.ts
 import { createSlice, PayloadAction, createAsyncThunk } from "@reduxjs/toolkit";
 import { NetworksState, NetworkSummary } from "../interface";
+import { saveNetworkData } from "../network/slice";
 import axios from "axios";
 
 const initialState: NetworksState = {
@@ -23,23 +23,42 @@ export const getNetworks = createAsyncThunk(
   async (_, thunkAPI) => {
     const state: any = thunkAPI.getState();
 
-    // 检查是否已有缓存的网络数据
+    // 获取缓存中的网络数据
     const cachedNetworks = state.networks?.data?.networks || [];
-    
-    // 如果已有网络数据，则直接返回缓存数据，不再重复请求
-    if (cachedNetworks.length > 0) {
-      console.log(cachedNetworks);
-      return { networks: cachedNetworks }; // 直接返回缓存的数据，避免多次更新
-    }
 
-    // 发起后端网络请求获取最新数据
+    // 发起后端请求以获取最新网络数据
     try {
       const { data } = await axios.get(`http://127.0.0.1:8888/networks/`);
       console.log('API response for getNetworks:', data);
-      
-      // 如果请求成功，将最新数据返回并更新 Redux store
-      return data;
-    } catch (error) {
+
+      // 将后端获取的数据与缓存中的数据进行对比，根据 network_id 进行增量更新
+      const updatedNetworks = cachedNetworks.map((cachedNetwork: any) => {
+        const latestNetwork = data.networks.find(
+          (network: any) => network.network_id === cachedNetwork.network_id
+        );
+        return latestNetwork ? latestNetwork : cachedNetwork; // 如果后端返回的数据有相同的 network_id，则替换
+      });
+
+      // 找出后端新增的网络并添加到更新后的数组中
+      const newNetworks = data.networks.filter(
+        (network: any) =>
+          !cachedNetworks.some(
+            (cachedNetwork: any) => cachedNetwork.network_id === network.network_id
+          )
+      );
+
+      const finalNetworks = [...updatedNetworks, ...newNetworks];
+
+      // 返回最终更新的网络数据
+      return {
+        networks: finalNetworks,
+        total_nes: data.total_nes,
+        total_networks: data.total_networks,
+        total_online_nes: data.total_online_nes,
+        total_online_sites: data.total_online_sites,
+        total_sites: data.total_sites,
+      };
+    } catch (error: any) {
       console.error('Failed to fetch networks:', error);
       throw error;  // 抛出错误以便 Redux Thunk 捕获处理
     }
@@ -64,27 +83,27 @@ export const syncNetworkStats = createAsyncThunk(
     networkDetails.forEach((network: any) => {
       const existingNetwork = networksStats.find((n: any) => n.network_id === network.network_id);
 
-      const neCountFromDevices = network.devices ? Object.keys(network.devices).length : 0;
+      const neCountFromElements = network.elements ? Object.keys(network.elements).length : 0;
 
       if (!existingNetwork) {
         console.log(`New network found: ${network.network_name}`);
         newOrUpdatedNetworks.push({
           network_id: network.network_id,
           network_name: network.network_name,
-          ne_count: neCountFromDevices || network.sites.length, // 修正这里，使用设备数量
+          ne_count: neCountFromElements || network.sites.length, // 修正这里，使用设备数量
           site_count: network.sites.length,
         });
       } else {
         if (
           existingNetwork.network_name !== network.network_name ||
-          existingNetwork.ne_count !== neCountFromDevices ||
+          existingNetwork.ne_count !== neCountFromElements ||
           existingNetwork.site_count !== network.sites.length
         ) {
           console.log(`Updated network found: ${network.network_name}`);
           newOrUpdatedNetworks.push({
             ...existingNetwork,
             network_name: network.network_name,
-            ne_count: neCountFromDevices || network.sites.length, // 修正这里，使用设备数量
+            ne_count: neCountFromElements || network.sites.length, // 修正这里，使用设备数量
             site_count: network.sites.length,
           });
         }
@@ -102,16 +121,17 @@ export const syncNetworkStats = createAsyncThunk(
   }
 );
 
-// 更新网络摘要的Action
 // 更新网络摘要的Action，支持添加网元和新网络的更新
 export const updateNetworksSummary = createAsyncThunk(
   "networks/updateNetworksSummary",
-  async ({ newNetwork, network_name, ne_count }: { newNetwork?: NetworkSummary[], network_name?: string, ne_count?: number }, thunkAPI) => {
+  async ({ newNetwork, network_name, ne_count, isLocked }: 
+         { newNetwork?: NetworkSummary[], network_name?: string, ne_count?: number, isLocked?: boolean }, 
+         thunkAPI) => {
     const state: any = thunkAPI.getState();
     const existingNetworks = state.networks?.data?.networks || [];
 
     // 打印输入的数据，确保 newNetwork 或 network_name 被正确传递
-    console.log("Received data for update:", { newNetwork, network_name, ne_count });
+    console.log("Received data for update:", { newNetwork, network_name, ne_count, isLocked });
 
     // 初始化一个用于存放更新后的 networks 的数组
     let updatedNetworks = [...existingNetworks];
@@ -127,6 +147,7 @@ export const updateNetworksSummary = createAsyncThunk(
             network_name: updatedNetwork.network_name, // 更新网络名称
             ne_count: updatedNetwork.ne_count,         // 更新NE数量
             site_count: updatedNetwork.site_count,     // 更新站点数量
+            isLocked: typeof updatedNetwork.isLocked === "boolean" ? updatedNetwork.isLocked : network.isLocked,  // 更新 isLocked 状态
           };
         }
         return network; // 没有匹配的返回原来的对象
@@ -142,7 +163,7 @@ export const updateNetworksSummary = createAsyncThunk(
       });
     }
 
-    // 如果传入了 network_name 和 ne_count，更新设备数量
+    // 如果传入了 network_name、ne_count 或 isLocked，更新相关字段
     if (network_name && typeof ne_count === "number") {
       updatedNetworks = updatedNetworks.map((network: any) => {
         if (network.network_name === network_name) {
@@ -150,6 +171,7 @@ export const updateNetworksSummary = createAsyncThunk(
           return {
             ...network,
             ne_count: ne_count, // 更新NE数量
+            isLocked: typeof isLocked === "boolean" ? isLocked : network.isLocked, // 更新 isLocked 状态（如果传递了）
           };
         }
         return network;
@@ -211,6 +233,11 @@ export const networksSlice = createSlice({
         state.loading = true;
       })
       .addCase(getNetworks.fulfilled, (state, action) => {
+        const networksWithLockStatus = action.payload.networks.map((network: any) => ({
+          ...network,
+          isLocked: network.isLocked || false, // 初始化 isLocked 为 false
+        }));
+        
         state.data.networks = action.payload.networks;
         state.data.total_nes = action.payload.total_nes;
         state.data.total_networks = action.payload.total_networks;
@@ -225,6 +252,7 @@ export const networksSlice = createSlice({
         state.loading = false;
         state.error = action.error.message || null;
       })
+
       .addCase(updateNetworksSummary.fulfilled, (state, action: PayloadAction<any>) => {
         console.log("Update Networks Summary fulfilled", action.payload);
         state.data.networks = action.payload.networks;

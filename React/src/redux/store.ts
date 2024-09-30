@@ -1,6 +1,7 @@
 import { actionLog } from "./middlewares/actionLog";
 import { networksSlice } from "./networks/slice";
 import { networkSlice } from "./network/slice";
+import { elementSlice } from "./element/slice";
 import { combineReducers, configureStore } from "@reduxjs/toolkit";
 import {persistStore, persistReducer} from "redux-persist";
 import storage from "redux-persist/lib/storage";
@@ -13,6 +14,7 @@ const persistConfig = {
 const rootReducer = combineReducers({
     networks: networksSlice.reducer,
     network: networkSlice.reducer,
+    element: elementSlice.reducer,
 })
 
 const persistedReducer = persistReducer(persistConfig, rootReducer)

@@ -2,7 +2,7 @@ from flask import Blueprint, jsonify, request
 from network_mgmt.global_data import devices, devices_snmp, topo_data
 from .ne_init import (
     get_snmpv3_data, discover_neighbors, is_valid_ip, 
-    filter_ssh_params
+    filter_ssh_params,query_device_via_gateway
 )
 from .topo_init import update_topo_data
 from netmiko import ConnectHandler
@@ -30,6 +30,11 @@ def add_device(network_name):
     print("Received data from frontend:", data)  # 打印接收到的前端数据
 
     ne_name = data['ne_name']
+
+    # 检查 ne_make 字段是否为 'cisco'
+    # device_type = data['ne_make']
+    # if device_type.lower() == 'cisco':
+    #     device_type = 'cisco_ios'  # 如果是 cisco，则将 device_type 设置为 cisco_ios
 
     # 准备用于SSH连接的设备信息，使用前端传递的 gne 字段
     gne_device = {
@@ -98,13 +103,19 @@ def set_snmp(network_name, ne_name):
 
             # 只选择部分 SNMP 数据传递给前端
             device_snmp_basic = {
-                'Device Name': device_snmp.get('Device Name'),
-                'Device Version': device_snmp.get('Device Version')
+                'device_name': data['ne_name'],
+                'status': 'Configured',
+                'snmp_username': data['snmp_username'],
+                'snmp_auth_protocol': data['snmp_auth_protocol'],
+                'snmp_auth_password': data['snmp_auth_password'],
+                'snmp_priv_protocol': data['snmp_priv_protocol'],
+                'snmp_priv_password': data['snmp_priv_password'],
+                'network_name': network_name  # 添加 network_name
             }
 
             device['snmp_setup_success'] = True  # Mark SNMP setup success
             
-            return jsonify({'status': 'success', 'message': 'SNMP setup successful.', 'device_snmp': device_snmp_basic, 'devices': list(devices.values())}), 200
+            return jsonify({'status': 'success', 'message': 'SNMP setup successful.', 'device_snmp': device_snmp_basic}), 200
         except Exception as e:
             logging.error(f"SNMP setup failed: {str(e)}")
             return jsonify({'status': 'failure', 'error': f'SNMP setup failed: {str(e)}'}), 500
@@ -116,21 +127,143 @@ def set_snmp(network_name, ne_name):
  # 发现网元的邻居
 @ne_mgmt_bp.route('/<network_name>/<ne_name>/discover', methods=['POST'])
 def discover_neighbors_route(network_name, ne_name):
-    ne_name = clean_input(ne_name) 
-    device = devices.get(ne_name)
-    if device:
-        neighbors, ne_connections = discover_neighbors(device)
-        
+    # 从请求体中获取设备信息
+    device = request.json
+
+    if not device.get('ne_name') or not device.get('network_name'):
+        return jsonify({'status': 'failure', 'error': 'Missing required device or network information'}), 400
+
+    # 提取并清理 ne_name
+    ne_name = clean_input(device['ne_name'])
+
+    # 检查设备是否已经存在于字典中
+    existing_device = devices.get(ne_name)
+
+    if existing_device:
+        # 更新设备字典中的设备信息
+        existing_device.update({
+            'ip': device.get('ne_ip', existing_device.get('ip')),
+            'device_type': device.get('ne_make', existing_device.get('device_type')),
+            'snmp_username': device.get('snmp_username', existing_device.get('snmp_username')),
+            'snmp_auth_protocol': device.get('snmp_auth_protocol', existing_device.get('snmp_auth_protocol')),
+            'snmp_auth_password': device.get('snmp_auth_password', existing_device.get('snmp_auth_password')),
+            'snmp_priv_protocol': device.get('snmp_priv_protocol', existing_device.get('snmp_priv_protocol')),
+            'snmp_priv_password': device.get('snmp_priv_password', existing_device.get('snmp_priv_password')),
+            'ssh_username': device.get('ssh_username', existing_device.get('ssh_username')),
+            'ssh_password': device.get('ssh_password', existing_device.get('ssh_password')),
+            'ssh_secret': device.get('ssh_secret', existing_device.get('ssh_secret'))
+        })
+
+        print(f"Updated device data: {existing_device}")  # 打印更新后的 device 数据
+
+        # 调用 discover_neighbors 进行邻居发现
+        discovered_devices, neighbors, ne_connections = discover_neighbors(existing_device)
+
         logging.debug(f"Neighbor connections: {ne_connections}") 
         print(f"Neighbor connections: {ne_connections}") 
-        logging.debug(f"Current devices in dictionary after discovering neighbors in /discover: {list(devices.keys())}")
-       
+
         # 更新全局拓扑数据
         update_topo_data(network_name)
 
-        return jsonify({'status': 'success', 'neighbors': neighbors, 'devices': list(devices.values()), 'topology': topo_data}), 200
+        # 返回邻居信息和拓扑数据，并将发现的邻居设备作为 devices 字段返回
+        return jsonify({
+            'status': 'success', 
+            'message': 'Neighbor discovery successful!',
+            'devices': discovered_devices,  # 返回当前发现的邻居设备
+            'topology': topo_data
+        }), 200
     else:
-        return jsonify({'status': 'failure', 'error': f'NE {ne_name} not found'}), 404   
+        # 如果设备不存在，返回错误
+        return jsonify({'status': 'failure', 'message': f'NE {ne_name} not found'}), 404
+
+#初使化网元配置
+@ne_mgmt_bp.route('/<network_name>/<ne_name>/query_config', methods=['POST'])
+def get_config(network_name, ne_name):
+    data = request.json
+    ne_name = clean_input(ne_name)
+
+    # 从前端接收的参数
+    ne_type = data.get('ne_type')
+    device_type = data.get('ne_make')
+    ip = data.get('ne_ip')  # 从前端传入的设备IP
+    gne_ip = data.get('gne')  # 从前端传入的GNE IP
+    ssh_username = data.get('ssh_username')
+    ssh_password = data.get('ssh_password')
+    ssh_secret = data.get('ssh_secret', '')
+
+    logging.info(f"Received request to query config for {ne_name} on {network_name} with IP {ip}. Device type: {device_type}")
+
+    # 检查是否提供了 SSH 凭据
+    if not ssh_username or not ssh_password or not ip:
+        logging.error("SSH credentials or IP address missing.")
+        return jsonify({
+            'status': 'failure',
+            'error': 'SSH credentials and IP address are required',
+            'message': '请提供有效的 SSH 凭据和 IP 地址以连接设备。'
+        }), 400
+
+    # 根据设备类型选择正确的默认命令
+    if device_type == 'huawei':
+        command = 'display current-configuration'
+    elif device_type == 'cisco_ios':
+        command = 'show running-config'  # 修复命令为Cisco设备的正确命令
+    else:
+        logging.error(f"Unsupported device type: {device_type}")
+        return jsonify({
+            'status': 'failure',
+            'error': f'Unsupported device type: {device_type}',
+            'message': '不支持的设备类型。'
+        }), 400
+
+    logging.info(f"Running command '{command}' on device type '{device_type}'.")
+
+    # 传递命令和设备类型到 query_device_via_gateway
+    result = query_device_via_gateway(gne_ip, ip, command, device_type, ssh_username, ssh_password, ssh_secret)
+
+    # 打印返回结果
+    logging.info(f"Query result for {ne_name}: {result}")
+
+    # 根据结果返回 JSON 响应
+    if result['status'] == 'success':
+        return jsonify({
+            'status': 'success',
+            'output': result['output'],  # 当前配置
+            'device_name': ne_name,
+            'ne_type': ne_type,  # 增加 ne_type，前端可以用来更新图标
+            'message': f'设备 {ne_name} 的配置已成功获取。请编辑并提交您的配置。'
+        }), 200
+    else:
+        return jsonify({
+            'status': 'failure',
+            'error': result['error'],
+            'message': f'无法获取设备 {ne_name} 的配置，请检查设备连接或 GNE 设置。'
+        }), 500
+    
+# Push Configuration
+@ne_mgmt_bp.route('/<network_name>/<ne_name>/apply_config', methods=['POST'])
+def apply_config(network_name, ne_name):
+    data = request.json
+    ne_name = clean_input(ne_name)
+    
+    # 获取新的配置
+    new_config = data.get('new_config')
+    device_type = data.get('ne_make')
+    ip = data.get('ne_ip')  # 从前端传入的设备IP
+    gne_ip = data.get('gne')  # 从前端传入的GNE IP
+    ssh_username = data.get('ssh_username')
+    ssh_password = data.get('ssh_password')
+    ssh_secret = data.get('ssh_secret', '')
+
+    if not ssh_username or not ssh_password or not new_config or not ip:
+        return jsonify({'status': 'failure', 'error': 'SSH credentials, new configuration, and IP are required'}), 400
+
+    # 使用 GNE 跳转到目标设备下发配置
+    result = query_device_via_gateway(gne_ip, ip, new_config, device_type, ssh_username, ssh_password, ssh_secret)
+    
+    if result['status'] == 'success':
+        return jsonify({'status': 'success', 'message': '新配置已成功下发到设备'}), 200
+    else:
+        return jsonify({'status': 'failure', 'error': result['error']}), 500
 
 # 保存初始化完成后的设备到 MongoDB 数据库
 @ne_mgmt_bp.route('/<network_name>/elements/save', methods=['POST'])

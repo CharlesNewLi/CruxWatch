@@ -63,25 +63,31 @@ export const addNetwork = createAsyncThunk(
   "network/addNetwork",
   async ({ network_id, network_name, sites }: { network_id: string, network_name: string, sites: any[] }, { dispatch }) => {
     console.log("Successfully created network:", network_id);
+
+    // 动态统计站点数和设备数
+    const siteCount = sites.length;
+    const neCount = sites.reduce((acc: number, site: any) => acc + (site.elements?.length || 0), 0); // 统计所有站点的设备数
     
     // 创建 networkSummary 对象
     const networkSummary: NetworkSummary = {
       network_id,
       network_name,
-      ne_count: 0,  // 新增设备计数
-      site_count: sites.length, // 假设站点数等于站点数组长度
+      ne_count: neCount,  // 新增设备计数
+      site_count: siteCount, // 假设站点数等于站点数组长度
+      isLocked: false,
     };
 
     // 模拟一个网络创建过程或实际向后端发送创建请求
     const networkData = {
       network_id,
       network_name,
-      ne_count: 0,  // 新增设备计数
+      ne_count: neCount,  // 新增设备计数
+      isLocked: false,
       online_ne_count: 0,  // 初始化为 0
       sites: sites.map(site => ({
         site_id: site.site_id,
         site_name: site.site_name,
-        devices: []
+        elements: []
       })),
     };
 
@@ -156,10 +162,10 @@ export const updateNetwork = createAsyncThunk(
           ...updatedNetwork.sites,
           ...newSiteEntries.map(site => ({
             site_id: site.site_id || uuidv4(),
-            site_name: site.site_name.trim()
+            site_name: site.site_name.trim(),
+            elements: []  // 初始化 devices 数组为空
           }))
         ];
-        updatedNetwork.site_count += newSiteEntries.length;
         isUpdated = true;
       }
     } else {
@@ -167,13 +173,17 @@ export const updateNetwork = createAsyncThunk(
     }
 
     if (isUpdated) {
-      updatedNetwork.site_count = updatedNetwork.sites.length;
+      // 动态计算 site_count 和 ne_count
+      const siteCount = updatedNetwork.sites.length;
+      const neCount = updatedNetwork.sites.reduce((acc: number, site: any) => acc + (site.elements?.length || 0), 0);
+      updatedNetwork.site_count = siteCount;
+      updatedNetwork.ne_count = neCount;
 
       const updatedNetworkSummary = {
         network_id: updatedNetwork.network_id,
         network_name: updatedNetwork.network_name,
-        ne_count: updatedNetwork.ne_count,
-        site_count: updatedNetwork.site_count,
+        ne_count: neCount,
+        site_count: siteCount,
       };
 
       thunkAPI.dispatch(updateNetworksSummary({ newNetwork: [updatedNetworkSummary] }));
@@ -186,6 +196,7 @@ export const updateNetwork = createAsyncThunk(
   }
 );
 
+// 删除网络的 async thunk action
 // 删除网络的 async thunk action
 export const deleteNetwork = createAsyncThunk(
   "network/deleteNetwork",
@@ -201,8 +212,23 @@ export const deleteNetwork = createAsyncThunk(
       return thunkAPI.rejectWithValue({ status: 404, message });
     }
 
-    // 返回更新后的 networkDetails
-    return { updatedNetworkDetails, status: 200 };
+    try {
+      // 调用后端路由删除 MongoDB 中相应的网络
+      const response = await axios.delete(`http://127.0.0.1:8888/networks/${network_id}`);
+      console.log(`Deleted network ${network_id} from database:`, response.data);
+
+      // 如果后端删除成功，返回更新后的 networkDetails
+      return { updatedNetworkDetails, status: 200 };
+    } catch (error) {
+      // 解决 'error' is of type 'unknown'
+      if (error instanceof Error) {
+        console.error(`Failed to delete network ${network_id} from database:`, error.message);
+        return thunkAPI.rejectWithValue({ status: 500, message: error.message });
+      } else {
+        console.error(`Failed to delete network ${network_id} from database:`, error);
+        return thunkAPI.rejectWithValue({ status: 500, message: "An unknown error occurred" });
+      }
+    }
   }
 );
 
@@ -219,12 +245,6 @@ export const updateSite = createAsyncThunk(
 
     console.log("Initial networkDetails:", networkDetails);
 
-    console.log("Provided network_id:", network_id);
-    console.log("NetworkDetails:", networkDetails);
-    networkDetails.forEach((network: any) => {
-      console.log("Checking network_id in networkDetails:", network.network_id);
-    });
-
     // 找到目标网络
     const existingNetwork = networkDetails.find((network: any) => network.network_id === network_id);
     if (!existingNetwork) {
@@ -233,31 +253,45 @@ export const updateSite = createAsyncThunk(
       return thunkAPI.rejectWithValue({ status: 404, message });
     }
 
-    // 找到目标站点
+    // 检查站点是否已存在
     const existingSite = existingNetwork.sites.find((site: any) => site.site_id === site_id);
-    if (!existingSite) {
-      const message = "Site not found";
-      console.warn(message);
-      return thunkAPI.rejectWithValue({ status: 404, message });
-    }
 
-    // 更新站点名称和位置信息
+    let updatedSite;
     let isUpdated = false;
-    let updatedSite = { ...existingSite };
 
-    // 更新站点名称
-    if (existingSite.site_name !== site_name) {
-      console.log(`Updating site name from ${existingSite.site_name} to ${site_name}`);
-      updatedSite.site_name = site_name.trim();
-      isUpdated = true;
-    }
+    if (existingSite) {
+      // 如果站点已存在，更新站点信息
+      updatedSite = { 
+        ...existingSite, 
+        site_name: site_name.trim(), 
+        site_location: { ...site_location }, 
+        elements: existingSite.elements || [] // 确保已有站点有 devices 数组
+      };
 
-    // 更新站点位置信息
-    if (existingSite.site_location?.latitude !== site_location.latitude || 
-        existingSite.site_location?.longitude !== site_location.longitude) {
-      console.log("Updating site location to", site_location);
-      updatedSite.site_location = { ...site_location };
-      isUpdated = true;
+      // 更新站点名称
+      if (existingSite.site_name !== site_name) {
+        console.log(`Updating site name from ${existingSite.site_name} to ${site_name}`);
+        updatedSite.site_name = site_name.trim();
+        isUpdated = true;
+      }
+
+      // 更新站点位置信息
+      if (existingSite.site_location?.latitude !== site_location.latitude || 
+          existingSite.site_location?.longitude !== site_location.longitude) {
+        console.log("Updating site location to", site_location);
+        updatedSite.site_location = { ...site_location };
+        isUpdated = true;
+      }
+    } else {
+      // 如果站点不存在，创建新站点并初始化 devices 数组
+      updatedSite = {
+        site_id: site_id || uuidv4(), // 如果没有传递 site_id，则生成一个新的
+        site_name: site_name.trim(),
+        site_location: { ...site_location },
+        elements: [] // 初始化为一个空的 devices 数组
+      };
+      console.log(`Creating new site with name ${site_name} and initializing devices array.`);
+      isUpdated = true; // 标记为已更新
     }
 
     if (!isUpdated) {
@@ -270,13 +304,35 @@ export const updateSite = createAsyncThunk(
       site.site_id === site_id ? updatedSite : site
     );
 
+    // 如果站点是新增的，将其加入站点列表
+    if (!existingSite) {
+      updatedSites.push(updatedSite);
+    }
+
     // 更新后的网络
     const updatedNetwork = { 
       ...existingNetwork, 
       sites: updatedSites 
     };
 
+    // 统计 site_count 和 ne_count
+    const siteCount = updatedNetwork.sites.length;
+    const neCount = updatedNetwork.sites.reduce((acc: number, site: any) => acc + (site.elements?.length || 0), 0);
+    updatedNetwork.site_count = siteCount;
+    updatedNetwork.ne_count = neCount;
+
     console.log("Updated network with new site details:", updatedNetwork);
+
+    // 更新网络摘要
+    const updatedNetworkSummary = {
+      network_id: updatedNetwork.network_id,
+      network_name: updatedNetwork.network_name,
+      ne_count: neCount, // 更新网元数量
+      site_count: siteCount, // 更新站点数量
+    };
+
+    // 触发网络摘要更新
+    thunkAPI.dispatch(updateNetworksSummary({ newNetwork: [updatedNetworkSummary] }));
 
     // 更新 networkDetails 缓存
     thunkAPI.dispatch(updateNetworkDetails({ newNetwork: updatedNetwork }));
@@ -315,8 +371,14 @@ export const deleteSite = createAsyncThunk(
     const updatedNetwork = { 
       ...existingNetwork, 
       sites: updatedSites,
-      site_count: updatedSites.length,  // 更新站点数量
     };
+
+    // 重新计算站点数量和网元数量
+    const siteCount = updatedSites.length;
+    const neCount = updatedSites.reduce((acc: number, site: any) => acc + (site.elements?.length || 0), 0);
+
+    updatedNetwork.site_count = siteCount;
+    updatedNetwork.ne_count = neCount;
 
     // 更新 networkDetails
     thunkAPI.dispatch(updateNetworkDetails({ newNetwork: updatedNetwork }));
@@ -325,8 +387,8 @@ export const deleteSite = createAsyncThunk(
     const updatedNetworkSummary = {
       network_id: updatedNetwork.network_id,
       network_name: updatedNetwork.network_name,
-      ne_count: updatedNetwork.ne_count,
-      site_count: updatedSites.length,  // 更新站点数量
+      ne_count: updatedNetwork.neCount,
+      site_count: siteCount,  // 更新站点数量
     };
 
     // 调用 updateNetworksSummary 来同步更新 networkSummary 中的数据
@@ -334,6 +396,165 @@ export const deleteSite = createAsyncThunk(
 
     // 返回更新后的网络
     return { updatedNetwork, status: 200 };
+  }
+);
+
+// 在 networkDetails 中添加设备移动逻辑
+export const moveDeviceToSite = createAsyncThunk(
+  "network/moveDeviceToSite",
+  async (
+    { network_id, ne_name, current_site_id, target_site_id }: 
+    { network_id: string, ne_name: string, current_site_id: string | null; target_site_id: string | null },
+    { getState, dispatch, rejectWithValue }
+  ) => {
+    const state: any = getState();
+    const networkDetails = state.network.networkDetails || [];
+    
+    const targetNetwork = networkDetails.find((network: any) => network.network_id === network_id);
+    if (!targetNetwork) {
+      console.error("Error: Network not found with ID", network_id);
+      return rejectWithValue("Network not found");
+    }
+    console.log("Target network found:", targetNetwork);
+
+    let device = null;
+    let updatedSites = [...targetNetwork.sites]; // 确保 sites 是新引用
+
+    // 根据 current_site_id 判断设备是在网络根目录还是在站点中
+    if (current_site_id === null) {
+      // current_site_id 为 null，设备在 network.devices 中查找
+      device = targetNetwork.elements[ne_name];
+      if (!device) {
+        console.error("Error: Device not found in network root with name", ne_name);
+        return rejectWithValue("Device not found in network");
+      }
+      console.log("Device found in network root:", device);
+
+      // 如果设备已经在根目录，不需要执行任何操作
+    } else {
+      // current_site_id 有值，设备在站点的 devices 中查找
+      const currentSiteIndex = targetNetwork.sites.findIndex((site: any) => site.site_id === current_site_id);
+      if (currentSiteIndex === -1) {
+        console.error("Error: Current site not found with ID", current_site_id);
+        return rejectWithValue("Current site not found");
+      }
+
+      const currentSite = updatedSites[currentSiteIndex];
+
+      device = currentSite.elements.find((d: any) => d.ne_name === ne_name);
+      if (!device) {
+        console.error("Error: Device not found in site", current_site_id, "with name", ne_name);
+        return rejectWithValue("Device not found in site");
+      }
+      console.log("Device found in current site:", currentSite.site_name);
+
+      // 从当前站点移除设备并创建新对象
+      const updatedCurrentSite = {
+        ...currentSite,
+        elements: currentSite.elements.filter((d: any) => d.ne_name !== ne_name),
+      };
+
+      // 更新当前站点在 sites 数组中的位置
+      updatedSites[currentSiteIndex] = updatedCurrentSite;
+    }
+
+    let updatedNetwork;
+
+    if (target_site_id === null) {
+      // 如果 target_site_id 为 null，将设备移回网络根目录
+      updatedNetwork = {
+        ...targetNetwork,
+        elements: { ...targetNetwork.elements, [ne_name]: device },
+        sites: updatedSites,
+      };
+      console.log(`Device ${ne_name} moved to network root`);
+    } else {
+      // 查找目标站点
+      const targetSiteIndex = targetNetwork.sites.findIndex((site: any) => site.site_id === target_site_id);
+      if (targetSiteIndex === -1) {
+        console.error("Error: Target site not found with ID", target_site_id);
+        return rejectWithValue("Target site not found");
+      }
+
+      const targetSite = updatedSites[targetSiteIndex];
+
+      // 将设备添加到目标站点的 devices 列表中
+      const updatedTargetSite = {
+        ...targetSite,
+        elements: [...targetSite.elements, device],
+      };
+
+      // 更新目标站点在 sites 数组中的位置
+      updatedSites[targetSiteIndex] = updatedTargetSite;
+
+      updatedNetwork = {
+        ...targetNetwork,
+        sites: updatedSites,
+      };
+
+      console.log(`Device ${ne_name} added to target site ${targetSite.site_name}`);
+    }
+
+    // 更新 networkDetails 中的网络数据
+    dispatch(updateNetworkDetails({ newNetwork: updatedNetwork }));
+
+    // 更新 networkSummary 中的网元数量
+    const updatedNetworkSummary = {
+      network_id: updatedNetwork.network_id,
+      network_name: updatedNetwork.network_name,
+      ne_count: updatedNetwork.ne_count,  // 保持不变
+      site_count: updatedNetwork.sites.length,  // 更新后的站点数量
+    };
+
+    // 调用 updateNetworksSummary 来同步更新 networkSummary 中的数据
+    dispatch(updateNetworksSummary({ newNetwork: [updatedNetworkSummary] }));
+
+    console.log("Device successfully moved");
+    return { network_id, ne_name, target_site_id };
+  }
+);
+
+// 定义 toggleNetworkLock 的异步动作
+export const toggleNetworkLock = createAsyncThunk(
+  "network/toggleNetworkLock",
+  async (network_id: string, { getState, dispatch }) => {
+    const state: any = getState();
+    const networksSummary = state.networks?.data?.networks || [];
+    const networkDetails = state.network?.networkDetails || [];
+
+    // 查找 networkSummary 和 networkDetails 中的目标网络
+    const networkSummary = networksSummary.find((n: any) => n.network_id === network_id);
+    const networkDetail = networkDetails.find((n: any) => n.network_id === network_id);
+
+    if (networkSummary && networkDetail) {
+      // 判断当前网络的锁定状态
+      const currentLockStatus = networkSummary.isLocked;
+
+      // 切换锁定状态（锁定/解锁）
+      const updatedNetworkSummary = { ...networkSummary, isLocked: !currentLockStatus };
+      const updatedNetworkDetail = { ...networkDetail, isLocked: !currentLockStatus };
+
+      // 将更新后的 networkSummary 和 networkDetails 保存到缓存
+      await dispatch(updateNetworksSummary({ newNetwork: [updatedNetworkSummary] }));
+      await dispatch(updateNetworkDetails({ newNetwork: updatedNetworkDetail }));
+
+      // 如果网络从 unlocked (false) 切换为 locked (true)，保存到数据库
+      if (!currentLockStatus) {
+        try {
+          // 传递指定 network_id 对应的网络详细信息进行保存
+          await dispatch(saveNetworkData({ network_id, networkDetails: state.network.networkDetails }));
+          console.log(`Network ${network_id} locked and saved to database.`);
+        } catch (error) {
+          console.error(`Error in saving network ${network_id}:`, error);
+          throw error;  // 抛出错误
+        }
+      }
+
+      // 返回更新后的网络状态
+      return updatedNetworkDetail;
+    }
+
+    throw new Error(`Network with id ${network_id} not found`);
   }
 );
 
@@ -349,106 +570,55 @@ export const updateNetworkDetails = createAsyncThunk(
       (network: any) => network.network_id === newNetwork.network_id
     );
 
+    let updatedNetworkDetails = [...networkDetails]; // 在外部声明
+
     if (existingNetworkIndex !== -1) {
       // 更新已有的网络详细信息
       console.log("Updating existing network in cache:", newNetwork);
-      const updatedNetworkDetails = [...networkDetails];
-      updatedNetworkDetails[existingNetworkIndex] = newNetwork;
-      return updatedNetworkDetails; // 返回更新后的 networkDetails
+      updatedNetworkDetails[existingNetworkIndex] = newNetwork; // 直接修改外部作用域的 updatedNetworkDetails
     } else {
       // 如果 networkDetails 中没有该网络，则添加进去
       console.log("Adding new network to cache:", newNetwork);
-      return [...networkDetails, newNetwork]; // 返回更新后的 networkDetails
+      updatedNetworkDetails.push(newNetwork); // 直接在外部的 updatedNetworkDetails 中添加
     }
+    
+    // 动态统计网元和站点数量
+    const neCount = updatedNetworkDetails.reduce((acc: number, network: any) => {
+      const siteNeCount = network.sites.reduce((siteAcc: number, site: any) => siteAcc + site.elements.length, 0);
+      return acc + siteNeCount + Object.keys(network.elements || {}).length;
+    }, 0);
+
+    const siteCount = updatedNetworkDetails.reduce((acc: number, network: any) => acc + network.sites.length, 0);
+
+    console.log("Recalculated totals:", { neCount, siteCount });
+
+    return { updatedNetworkDetails, neCount, siteCount }; // 返回更新后的 networkDetails 和统计数据
   }
 );
 
-// 新增网元
-export const addNetworkElement = createAsyncThunk(
-  "network/addNetworkElement",
-  async (elementData: any, { dispatch, getState, rejectWithValue }) => {
+// 定义独立的异步请求函数，用于保存指定 network_id 的网络数据（包括 elements 和 topology）
+export const saveNetworkData = createAsyncThunk(
+  "networks/saveNetworkData",
+  async ({ network_id, networkDetails }: { network_id: string, networkDetails: any }) => {
     try {
-      console.log("Sending request with data: ", elementData);
-
-      // 发送 POST 请求到后端以添加设备
-      const response = await axios.post(`http://127.0.0.1:8888/${elementData.network_name}/elements/add`, elementData);
-
-      if (response.status === 201) {
-        console.log("Response received: ", response.data);
-
-        const { device, topology } = response.data;
-
-        // Dispatch 更新缓存和统计信息
-        dispatch(updateNetworkWithDevice({ device, topology }));
-
-        return response.data; // 返回后端数据
-      } else {
-        return rejectWithValue(response.data); // 失败时返回后端响应的错误数据
+      // 筛选出指定 network_id 的网络字典
+      const targetNetwork = networkDetails.find((network: any) => network.network_id === network_id);
+      
+      if (!targetNetwork) {
+        throw new Error(`Network with id ${network_id} not found`);
       }
-    } catch (error: any) {
-      console.error("Error adding network element:", error);
 
-      if (error.response) {
-        return rejectWithValue(error.response.data);
-      } else if (error instanceof Error) {
-        return rejectWithValue(error.message);
-      } else {
-        return rejectWithValue("An unknown error occurred");
-      }
+      // POST 请求将 targetNetwork 写入数据库
+      const response = await axios.post(`http://127.0.0.1:8888/networks/${network_id}`, {
+        networkDetails: targetNetwork,  // 只传递指定网络的详情
+      });
+
+      console.log(`Network ${network_id} saved to database:`, response.data);
+      return response.data;  // 返回服务器的响应
+    } catch (error) {
+      console.error(`Failed to save network ${network_id} to database:`, error);
+      throw error;  // 抛出错误以便 Redux Thunk 捕获处理
     }
-  }
-);
-
-// 更新 networkDetails 和 networkSummary 中的设备信息
-export const updateNetworkWithDevice = createAsyncThunk(
-  "network/updateNetworkWithDevice",
-  async ({ device, topology }: { device: any; topology: any }, { dispatch, getState }) => {
-    const state: any = getState();
-    const networkDetails = state.network.networkDetails || [];
-    const networks = state.networks?.data?.networks || [];
-
-    // 找到目标网络
-    const networkIndex = networkDetails.findIndex((network: any) => network.network_name === device.network_name);
-    if (networkIndex === -1) {
-      console.error("Network not found in cache:", device.network_name);
-      return;
-    }
-
-    // 更新 networkDetails 中的设备和拓扑信息
-    const updatedNetwork = { ...networkDetails[networkIndex] };
-    updatedNetwork.topology = topology; // 更新拓扑
-
-    // 为设备生成新的 ne_id，使用 uuidv4
-    const generatedNeId = uuidv4();
-    const updatedDevice = {
-      ...device,
-      ne_id: generatedNeId, // 给设备分配生成的 ne_id
-    };
-
-    // 以 device_name 作为键更新设备
-    if (!updatedNetwork.devices) {
-      updatedNetwork.devices = {};
-    }
-    updatedNetwork.devices[device.device_name] = updatedDevice; // 使用 device_name 作为键并添加设备
-
-    // 更新缓存中的 networkDetails
-    const updatedNetworkDetails = [...networkDetails];
-    updatedNetworkDetails[networkIndex] = updatedNetwork;
-
-    // Dispatch 更新 networkDetails 和 networks 的统计信息
-    dispatch(updateNetworkDetails({ newNetwork: updatedNetwork }));
-
-    // 更新 networkSummary 中的 ne_count 和 total_nes
-    dispatch(updateNetworksSummary({ 
-      newNetwork: [{
-        network_id: updatedNetwork.network_id,
-        network_name: updatedNetwork.network_name,
-        ne_count: Object.keys(updatedNetwork.devices).length, // 设备数量
-        site_count: updatedNetwork.site_count
-      }]
-    }));
-
-    return updatedDevice; // 返回带有新的 ne_id 的设备
   }
 );
 
@@ -473,6 +643,19 @@ export const networkSlice = createSlice({
         // 检查网络是否已经存在，存在则更新，否则添加
         const existingNetworkIndex = state.networkDetails.findIndex((network: any) => network.network_id === action.payload.network_id);
 
+        // 动态统计 site_count 和 ne_count
+        const siteCount = action.payload.sites.length;  // 站点数量
+        const neCount = action.payload.sites.reduce(
+          (acc: number, site: any) => acc + (site.elements?.length || 0), 0
+        );  // 设备数量统计
+
+        // 构建更新后的网络数据，包含统计的 ne_count 和 site_count
+        const updatedNetwork = {
+          ...action.payload,
+          site_count: siteCount,
+          ne_count: neCount,
+        };
+              
         if (existingNetworkIndex !== -1) {
           // 更新已存在的网络
           state.networkDetails[existingNetworkIndex] = action.payload;
@@ -490,36 +673,26 @@ export const networkSlice = createSlice({
         console.error("Failed to fetch network data:", action.error.message);
       })
 
-      // 处理 updateNetworkDetails 的缓存更新
-      .addCase(updateNetworkDetails.fulfilled, (state, action: PayloadAction<any>) => {
-        console.log("Successfully updated network cache with:", action.payload);
-
-        // 直接将新的 networkDetails 更新到缓存
-        state.networkDetails = action.payload;
-      })
-
       // 处理新增网络的请求
       .addCase(addNetwork.pending, (state) => {
         state.loading = true;
       })
       .addCase(addNetwork.fulfilled, (state, action: PayloadAction<any>) => {
-        state.networkDetails.push(action.payload);
+        const siteCount = action.payload.sites.length;
+        const neCount = action.payload.sites.reduce((acc: number, site: any) => acc + (site.elements?.length || 0), 0);
+      
+        // 构建更新后的网络数据，包含统计的 ne_count 和 site_count
+        const updatedNetwork = {
+          ...action.payload,
+          ne_count: neCount,  // 设备总数
+          site_count: siteCount  // 站点总数
+        };
+      
+        state.networkDetails.push(updatedNetwork);
         state.loading = false;
         state.error = null;
       })
       .addCase(addNetwork.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.error.message || null;
-      })
-
-      // 处理删除网络的请求
-      .addCase(deleteNetwork.fulfilled, (state, action) => {
-        const { updatedNetworkDetails } = action.payload;
-        state.networkDetails = updatedNetworkDetails;
-        state.loading = false;
-        state.error = null;
-      })
-      .addCase(deleteNetwork.rejected, (state, action) => {
         state.loading = false;
         state.error = action.error.message || null;
       })
@@ -538,7 +711,16 @@ export const networkSlice = createSlice({
           );
       
           if (networkIndex !== -1) {
-            state.networkDetails[networkIndex] = data;
+            // 动态计算 site_count 和 ne_count
+            const siteCount = data.sites.length;
+            const neCount = data.sites.reduce((acc: number, site: any) => acc + (site.elements?.length || 0), 0);
+      
+            // 更新已存在的网络，同时更新统计
+            state.networkDetails[networkIndex] = {
+              ...data,
+              site_count: siteCount,  // 站点总数
+              ne_count: neCount,      // 设备总数
+            };
           }
       
           console.log("Network updated successfully");
@@ -558,19 +740,127 @@ export const networkSlice = createSlice({
         console.error(`Failed to update network: ${message} (Status: ${status})`);
       })
 
-      .addCase(addNetworkElement.fulfilled, (state, action) => {
-        const { devices, topology } = action.payload;
-    
-        // 更新 networkDetails 中的 devices 和拓扑信息
-        const networkIndex = state.networkDetails.findIndex(
-          (network: any) => network.network_id === action.meta.arg.network_id
-        );
-    
-        if (networkIndex !== -1) {
-          state.networkDetails[networkIndex].devices = devices;
-          state.networkDetails[networkIndex].topology = topology;
+      // 处理删除网络的请求
+      .addCase(deleteNetwork.fulfilled, (state, action) => {
+        const { updatedNetworkDetails } = action.payload;
+        state.networkDetails = updatedNetworkDetails;
+        state.loading = false;
+        state.error = null;
+      })
+      .addCase(deleteNetwork.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.error.message || null;
+      })
+
+      // 处理 updateSite 的请求
+      .addCase(updateSite.pending, (state) => {
+        state.loading = true;
+      })
+      .addCase(updateSite.fulfilled, (state, action) => {
+        const payload = action.payload as { data: any; status: number };
+        const { data, status } = payload;
+
+        if (status === 200) {
+          const networkIndex = state.networkDetails.findIndex(
+            (network: any) => network.network_id === data.network_id
+          );
+
+          if (networkIndex !== -1) {
+            state.networkDetails[networkIndex] = data;
+          }
+
+          console.log("Site updated successfully");
+        } else if (status === 304) {
+          console.log("No changes made to the site");
         }
-      });
+
+        state.loading = false;
+        state.error = null;
+      })
+      .addCase(updateSite.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.error.message || null;
+        console.error("Failed to update site:", action.error.message);
+      })
+
+      // 处理 deleteSite 的请求
+      .addCase(deleteSite.pending, (state) => {
+        state.loading = true;
+      })
+      .addCase(deleteSite.fulfilled, (state, action) => {
+        const payload = action.payload as { updatedNetwork: any; status: number };
+        const { updatedNetwork, status } = payload;
+
+        if (status === 200) {
+          const networkIndex = state.networkDetails.findIndex(
+            (network: any) => network.network_id === updatedNetwork.network_id
+          );
+
+          if (networkIndex !== -1) {
+            state.networkDetails[networkIndex] = updatedNetwork;
+          }
+
+          console.log("Site deleted and network updated successfully");
+        }
+
+        state.loading = false;
+        state.error = null;
+      })
+      .addCase(deleteSite.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.error.message || null;
+        console.error("Failed to delete site:", action.error.message);
+      })
+
+      // 处理 moveDeviceToSite 的请求
+      .addCase(moveDeviceToSite.pending, (state) => {
+        state.loading = true;
+      })
+      .addCase(moveDeviceToSite.fulfilled, (state, action) => {
+        const payload = action.payload;
+        console.log("Device moved successfully:", payload);
+
+        // 更新网络成功后，设置 loading 为 false
+        state.loading = false;
+        state.error = null;
+      })
+      .addCase(moveDeviceToSite.rejected, (state, action) => {
+        console.error("Device move failed:", action.error.message || action.payload);
+        state.loading = false;
+        state.error = action.error.message || null;
+      })
+
+      // 处理 toggleNetworkLock 成功的情况
+      .addCase(toggleNetworkLock.fulfilled, (state, action) => {
+        const updatedNetworkDetail = action.payload;
+      
+        // 查找并更新 networkDetails 中的目标网络
+        const networkDetailIndex = state.networkDetails.findIndex(
+          (network: any) => network.network_id === updatedNetworkDetail.network_id
+        );
+      
+        if (networkDetailIndex !== -1) {
+          // 如果找到目标网络，更新其详细信息
+          state.networkDetails[networkDetailIndex] = updatedNetworkDetail;
+        } else {
+          // 如果没有找到，则将其作为新网络添加
+          state.networkDetails.push(updatedNetworkDetail);
+        }
+      
+        console.log("Network lock state updated in networkDetails:", updatedNetworkDetail);
+      })
+
+      // 处理 updateNetworkDetails 的缓存更新
+      .addCase(updateNetworkDetails.fulfilled, (state, action: PayloadAction<any>) => {
+        console.log("Successfully updated network cache with:", action.payload);
+
+        const { updatedNetworkDetails } = action.payload;
+
+        // 更新缓存中的 networkDetails
+        state.networkDetails = updatedNetworkDetails;
+
+        console.log("Current networkDetails in memory after updateNetworkDetails.fulfilled:", state.networkDetails); // 打印内存中的 networkDetails 数据结构
+      })
   },
 });
 

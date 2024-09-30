@@ -1,0 +1,10 @@
+
+CR1#
+CR1#terminal width 511
+CR1#terminal length 0
+CR1#
+CR1#
+CR1#
+CR1#
+CR1#
+CR1#exit

@@ -1,6 +1,7 @@
 from network_mgmt.global_data import devices, ne_connections
 import logging
 import socket
+from netmiko import ConnectHandler
 from pysnmp.hlapi import *
 from cachetools import cached, TTLCache
 
@@ -173,6 +174,7 @@ def discover_neighbors(device):
         raise ValueError(f"Unsupported privacy protocol: {priv_protocol_input}")
     
     neighbors = []
+    discovered_devices = {}  # 新增：存储已发现的邻居设备
 
     if device['device_type'] == 'cisco_ios':
         # 使用CDP发现邻居
@@ -237,7 +239,7 @@ def discover_neighbors(device):
         ne_device_key = ne_name
         ne_device = {
             'device_type': device['device_type'],
-            'ne_type': device['ne_type'],
+            'ne_type': 'defaultIcon',
             'device_name': ne_name,
             'ip': ne_ip,
             'ssh_username': device['ssh_username'],  # Use SSH credentials from the main device
@@ -250,12 +252,106 @@ def discover_neighbors(device):
             'network_name': device['network_name']
         }
 
+        # 加入到邻居设备列表并保存到 discovered_devices
+        discovered_devices[ne_device_key] = ne_device
+
+        # 添加到 neighbors 和 ne_connections 中（拓扑用）
+        neighbors.append(ne_device_key)
+        ne_connections.append((device['device_name'], ne_device['device_name']))
+
         # Add new neighbor device to the devices dictionary
         if not any(d['ip'] == ne_ip for d in devices.values()):
             devices[ne_device_key] = ne_device
-            neighbors.append(ne_device_key)
-
-            # Add the connection (link) between the current device and the neighbor
-            ne_connections.append((device['device_name'], ne_device['device_name']))    
     
-    return neighbors, ne_connections
+    return discovered_devices, neighbors, ne_connections
+
+# Query device via GNE as a gateway
+def query_device_via_gateway(gne_ip, target_ip, command, device_type, ssh_username, ssh_password, ssh_secret):
+    try:
+        # 构造 SSH 连接的基本参数
+        target_params = {
+            'device_type': device_type,
+            'ip': target_ip,
+            'username': ssh_username,
+            'password': ssh_password,
+            'secret': ssh_secret,
+            'session_log': f'session_log_{target_ip}.txt',
+            'global_delay_factor': 2  # 增加全局延迟
+        }
+
+        logging.info(f"Device type: {device_type}, command: {command}")
+
+        # Huawei通过GNE设备跳转的逻辑
+        if device_type == 'huawei' and gne_ip and gne_ip != target_ip:
+            gne_params = {
+                'device_type': device_type,
+                'ip': gne_ip,
+                'username': ssh_username,
+                'password': ssh_password,
+                'secret': ssh_secret,
+                'session_log': f'session_log_{gne_ip}.txt',
+                'global_delay_factor': 2
+            }
+
+            logging.info(f"Connecting to GNE device {gne_ip} to reach target device {target_ip}")
+            connection = ConnectHandler(**gne_params)
+            if 'secret' in gne_params:
+                connection.enable()
+
+            # 跳转到目标设备
+            stelnet_command = f"stelnet {target_ip}"
+            command_output = connection.send_command_timing(stelnet_command)
+
+            # 处理认证提示
+            if 'The server is not authenticated' in command_output:
+                command_output += connection.send_command_timing('Y')
+
+            command_output += connection.send_command_timing(ssh_username)
+            command_output += connection.send_command_timing(ssh_password)
+
+            if 'Change now? [Y/N]' in command_output:
+                command_output += connection.send_command_timing('N')
+
+            # 执行命令
+            connection.send_command('screen-length 0 temporary')
+            command_output += connection.send_command(command, expect_string=r'[>#]', read_timeout=20)
+        else:
+            # 直接连接到目标设备（适用于Cisco或者Huawei不使用GNE的情况）
+            logging.info(f"Connecting directly to device {target_ip}")
+            connection = ConnectHandler(**target_params)
+
+            # 对于 Cisco 设备，进入 enable 模式并执行命令
+            if device_type == 'cisco_ios':
+                logging.info("Entering enable mode for Cisco device...")
+
+                # 如果有 enable 密码，则执行 connection.enable() 否则直接输入 enable
+                if ssh_secret:
+                    connection.enable()
+                else:
+                    # 直接执行 enable，无需密码
+                    output = connection.send_command_timing('enable')
+                    if 'Password' in output:
+                        # 如果提示输入密码但未提供，直接继续
+                        logging.info("No enable password provided, skipping password input.")
+                        output += connection.send_command_timing('\n')
+
+                logging.info(f"Enable mode output: {output}")
+
+                # 关闭分页输出，防止分页中断
+                connection.send_command('terminal length 0')
+
+            # 执行指定的命令，并增加读取超时时间
+            logging.info(f"Executing command: {command}")
+            command_output = connection.send_command(command, expect_string=r'[>#]', read_timeout=60, delay_factor=2)
+
+            # 打印完整的命令输出
+            logging.info(f"Command output: {command_output}")
+
+        connection.send_command_timing('quit')
+        connection.disconnect()
+
+        return {'status': 'success', 'output': command_output}
+
+    except Exception as e:
+        logging.error(f"Error during SSH connection: {str(e)}")
+        return {'status': 'failure', 'error': str(e)}

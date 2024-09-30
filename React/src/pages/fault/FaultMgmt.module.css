@@ -1,0 +1,37 @@
+.container {
+    display: flex;
+    width: 1500px;
+    height: calc(100vh - 100px); /* 让页面占满可视区域 */
+  }
+  
+  .sidebar {
+    flex: 1; /* 自动调整宽度的侧边栏 */
+    width: 15% !important; /* 可设定最大宽度 */
+    background-color: #ffffff !important;
+    padding: 1%;
+    border-right: 2px solid #e0e0e0; /* 添加分隔线 */
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); /* 侧边栏阴影效果 */
+  }
+  
+  .sidebarTitle {
+    margin-bottom: 20px;
+    font-size: 18px;
+    font-weight: 600;
+    color: #003366; /* 深蓝色标题，符合网络管理主题 */
+  }
+  
+  .sidebarButton {
+    display: flex; /* 使用flex布局，将子项水平排列 */
+    justify-content: space-between; /* 在父容器中均匀分布每个子项 */
+    margin-bottom: 5%;
+  }
+  
+  .networkTree {
+    border-top: 1px solid #e0e0e0; /* 树结构上方添加分隔线 */
+    padding-top: 1%;
+  }
+  
+  .content {
+    flex: auto;
+    width: 98%;
+  }
