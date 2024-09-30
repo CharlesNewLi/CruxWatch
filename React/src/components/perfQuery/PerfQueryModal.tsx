@@ -57,39 +57,45 @@ export const PerfQueryModal: React.FC<PerfQueryModalProps> = ({ visible, selecte
   };
 
   // 表格列定义
-  const columns = [
-    {
-      title: 'Interface Index',
-      dataIndex: 'Index',
-      key: 'Index',
+const columns = [
+  {
+    title: 'Interface Index',
+    dataIndex: 'Index',
+    key: 'Index',
+  },
+  {
+    title: 'Description',
+    dataIndex: 'Description',
+    key: 'Description',
+  },
+  {
+    title: 'Status',
+    dataIndex: 'Status',
+    key: 'Status',
+    render: (status: string) => {
+      // 将状态值 1 映射为 UP，2 映射为 DOWN
+      return status === '1' ? 'UP' : status === '2' ? 'DOWN' : 'Unknown';
     },
-    {
-      title: 'Description',
-      dataIndex: 'Description',
-      key: 'Description',
+  },
+  {
+    title: 'IP Address',
+    dataIndex: 'IP Address',
+    key: 'IP Address',
+  },
+  {
+    title: 'Utilization (In/Out)',
+    dataIndex: 'InOctets',  // 需要从 InOctets 和 OutOctets 渲染
+    key: 'Utilization',
+    render: (text: string, record: any) => {
+      // 检查是否有 InOctets 和 OutOctets 数据并进行渲染
+      const inOctets = record.InOctets || '0';
+      const outOctets = record.OutOctets || '0';
+      
+      // 渲染显示的格式为: In: X bytes / Out: X bytes
+      return `In: ${inOctets} bytes / Out: ${outOctets} bytes`;
     },
-    {
-      title: 'Status',
-      dataIndex: 'Status',
-      key: 'Status',
-    },
-    {
-      title: 'IP Address',
-      dataIndex: 'IP Address',
-      key: 'IP Address',
-    },
-    {
-      title: 'Utilization (In/Out)',
-      dataIndex: 'Utilization',
-      key: 'Utilization',
-      render: (utilization: any) => {
-        if (utilization) {
-          return `In: ${utilization.InOctets} / Out: ${utilization.OutOctets}`;
-        }
-        return 'N/A';
-      },
-    }
-  ];
+  }
+];
 
   // CPU 利用率条形图
   const cpuData = snmpData?.cpu_metrics ? [{ metric: 'CPU', value: snmpData.cpu_metrics }] : [];
@@ -111,6 +117,7 @@ export const PerfQueryModal: React.FC<PerfQueryModalProps> = ({ visible, selecte
         opacity: 0.6,
       },
     },
+    height: 150,
   };
 
   const storageConfig = {
@@ -125,6 +132,7 @@ export const PerfQueryModal: React.FC<PerfQueryModalProps> = ({ visible, selecte
         opacity: 0.6,
       },
     },
+    height: 150,
   };
 
   return (

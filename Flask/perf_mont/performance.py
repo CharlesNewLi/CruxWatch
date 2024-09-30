@@ -68,6 +68,8 @@ def get_snmpv3_data(device):
         ObjectType(ObjectIdentity('1.3.6.1.2.1.2.2.1.1')),  # ifIndex 接口索引
         ObjectType(ObjectIdentity('1.3.6.1.2.1.2.2.1.2')),  # ifDescr 接口描述
         ObjectType(ObjectIdentity('1.3.6.1.2.1.2.2.1.8')),  # ifOperStatus 接口状态
+        ObjectType(ObjectIdentity('1.3.6.1.2.1.2.2.1.10')),  # ifInOctets 接收到的字节数
+        ObjectType(ObjectIdentity('1.3.6.1.2.1.2.2.1.16')),  # ifOutOctets 发送的字节数
         lexicographicMode=False
     )
 
@@ -84,7 +86,9 @@ def get_snmpv3_data(device):
             'Index': if_index,  # 接口索引
             'Description': str(varBinds[1][1]),  # 接口名称
             'Status': str(varBinds[2][1]),  # 接口状态
-            'IP Address': None  # 占位符，稍后获取IP地址
+            'IP Address': None,  # 占位符，稍后获取IP地址
+            'InOctets': str(varBinds[3][1]),  # 接收到的字节数
+            'OutOctets': str(varBinds[4][1]),  # 发送的字节数
         }
         ne_node['Interfaces'].append(interface_info)
         interface_indexes[if_index] = interface_info  # 存储接口索引以便后续查找
