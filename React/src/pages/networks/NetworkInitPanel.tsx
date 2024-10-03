@@ -193,7 +193,7 @@ export const NetworkInitPanel: React.FC<NetworkInitPanelProps> = ({
         </Space>
 
         {/* 添加 NE 表单 */}
-        <div className={styles.formContainer}>
+        <div>
           <ElementForm 
             onSSHSubmit={handleAddNe} 
             onSNMPSubmit={handleSetSNMP}
@@ -202,7 +202,7 @@ export const NetworkInitPanel: React.FC<NetworkInitPanelProps> = ({
         </div>
 
         {/* 拓扑图 */}
-        <div className={styles.topoViewContainer}>
+        <div>
           {currentTopology ? (
             <TopoInitView 
             topology={currentTopology} 

@@ -113,7 +113,7 @@ export const TopoInitView: React.FC<TopoInitViewProps> = ({ topology, elements, 
 
   return (
     <div className={styles.topology}>
-      <div ref={visJsRef} className={styles.topologyPlaceholder} style={{ height: "500px" }}></div>
+      <div ref={visJsRef} className={styles.topologyPlaceholder}></div>
     </div>
   );
 };

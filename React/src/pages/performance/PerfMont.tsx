@@ -61,13 +61,16 @@ export const PerfMont: React.FC = () => {
         </Sider> 
 
         <Content className={styles.content}>
+          {selectedNetwork ? (
             <DevicePerfPanel
             networkName={selectedNetworkName || "Unnamed Network"}
             networkId={selectedNetwork || " "}
             />
+          ) : (
             <div className={styles.placeholder}>
                 <Title level={4}>No network selected.</Title>
             </div>
+          )}
         </Content>
       </Layout>    
     </MainLayout>

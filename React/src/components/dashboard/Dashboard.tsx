@@ -24,11 +24,6 @@ export const Dashboard: React.FC = () => {
   if (error) {
     return <div>Error: {error}</div>; // 显示错误信息
   }
-
-  // 提取第一个网络的 network_name
-  //const firstNetwork = networks && networks.networks && networks.networks.length > 0 
-    //? networks.networks[0].network_name 
-    //: null;
    
   return (
     <div className={styles.outer}>
@@ -57,14 +52,14 @@ export const Dashboard: React.FC = () => {
         </div>
         <div className={styles.inner_small}>
           <ProfileImage 
-            title="Fault Management" 
+            title="Fault Monitor" 
             icon="warning" 
             link="/fault" 
           />
         </div>
         <div className={styles.inner_small}>
           <ProfileImage 
-            title="Security Management" 
+            title="Security Monitor" 
             icon="safety" 
             link="/security" 
           />

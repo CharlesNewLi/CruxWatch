@@ -104,9 +104,6 @@ export interface NetworksState {
     networks: any[]; // 所有网络的列表
     total_nes: number; // 总的网络元数量
     total_networks: number; // 网络总数
-    total_online_networks: number;
-    total_online_nes: number; // 在线的网络元总数
-    total_online_sites: number; // 在线站点总数
     total_sites: number; // 总的站点数量
   };
 }

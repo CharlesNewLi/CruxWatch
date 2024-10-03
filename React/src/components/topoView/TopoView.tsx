@@ -105,7 +105,7 @@ export const TopoView: React.FC<TopoViewProps> = ({ topology, elements, onDevice
 
   return (
     <div className={styles.topology}>
-      <div ref={visJsRef} className={styles.topologyPlaceholder} style={{ height: "500px" }}></div>
+      <div ref={visJsRef} className={styles.topologyPlaceholder} style={{ height: "570px" }}></div>
     </div>
   );
 };

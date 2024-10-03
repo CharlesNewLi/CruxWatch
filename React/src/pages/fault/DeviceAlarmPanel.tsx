@@ -1,9 +1,10 @@
 import React, { useState, useMemo } from "react";
 import { Typography, Space, Button } from "antd";
 import { useSelector } from "../../redux/hooks"; 
+import { useNavigate } from "react-router-dom";
 import { TopoView } from "../../components/topoView"; 
 import { AlarmCollectionPanel } from "../../components/alarmCollection/AlarmCollectionPanel"; 
-import { SettingOutlined, ReloadOutlined, AlertOutlined } from "@ant-design/icons";
+import { ClusterOutlined, SettingOutlined, LineChartOutlined, SafetyOutlined } from "@ant-design/icons";
 import styles from "./DeviceAlarmPanel.module.css";
 
 const { Title } = Typography;
@@ -32,6 +33,7 @@ export const DeviceAlarmPanel: React.FC<DeviceAlarmPanelProps> = ({
   }, [networkId, networkStats]);
 
   const [selectedDevice, setSelectedDevice] = useState<any | null>(null);
+  const navigate = useNavigate();
 
   const handleDeviceClick = (device: any) => {
     setSelectedDevice(device);
@@ -39,12 +41,16 @@ export const DeviceAlarmPanel: React.FC<DeviceAlarmPanelProps> = ({
 
   return (
     <div className={styles.panel}>
-      <Title level={4}>{networkName} Management</Title>
+      {/* Center the title */}
+      <div style={{ textAlign: "center" }}>
+        <Title level={4}>{networkName} Fault Monitor</Title>
+      </div>
       
       <Space className={styles.buttonSpace}>
-        <Button icon={<SettingOutlined />}>Configure Device</Button>
-        <Button icon={<ReloadOutlined />}>Reload</Button>
-        <Button icon={<AlertOutlined />}>Check Alerts</Button>
+        <Button icon={<ClusterOutlined />} onClick={() => navigate("/networks")}></Button>
+        <Button icon={<SettingOutlined />} onClick={() => navigate("/configuration")}></Button>
+        <Button icon={<LineChartOutlined />} onClick={() => navigate("/performance")}></Button>
+        <Button icon={<SafetyOutlined />} onClick={() => navigate("/security")}></Button>
       </Space>
       
       {/* 告警面板接收 trapData */}

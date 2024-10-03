@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Button, Input, Select, Form, Space, Typography } from "antd";
+import { Button, Input, Select, Form, Typography } from "antd";
 import styles from "./NetworkInitPanel.module.css"; // 定义样式
 
 const { Option } = Select;
@@ -127,7 +127,7 @@ export const ElementForm: React.FC<ElementFormProps> = ({ onSSHSubmit, onSNMPSub
       {/* Add NE Form */}
       <Form onFinish={handleSSHSubmit} className={styles.ElementForm}>
         <Title level={4}>Add GNE</Title>
-        <Space size="large" className={styles.fullWidthSpace}>
+        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
           <Form.Item
             name="neName"
             rules={[{ required: true, message: "Please input NE Name!" }]}
@@ -206,85 +206,81 @@ export const ElementForm: React.FC<ElementFormProps> = ({ onSSHSubmit, onSNMPSub
           </Form.Item>
           {/* Add NE 按钮 */}
           <Button type="primary" htmlType="submit">
-            Add NE
+            OK
           </Button>
-        </Space>
+        </div>
       </Form>
 
-      {isDeviceAdded && (
-        <>
-          {/* SNMP 配置表单 */}
-          <Title level={4}>Configure SNMP</Title>
-          <Space size="large" className={styles.fullWidthSpace}>
-            <Form.Item
-              name="snmpUsername"
-              rules={[{ required: true, message: "Please input SNMP Username!" }]}
-            >
-              <Input
-                name="snmpUsername"
-                value={neData.snmpUsername}
-                onChange={handleInputChange}
-                placeholder="SNMP Username"
-              />
-            </Form.Item>
-            <Form.Item
-              name="snmpAuthProtocol"
-              rules={[{ required: true, message: "Please select SNMP Auth Protocol!" }]}
-            >
-              <Select
-                value={neData.snmpAuthProtocol}
-                onChange={(value) => handleSelectChange(value, "snmpAuthProtocol")}
-                placeholder="SNMP Auth Protocol"
-              >
-                <Option value="MD5">MD5</Option>
-                <Option value="SHA">SHA</Option>
-              </Select>
-            </Form.Item>
-            <Form.Item
-              name="snmpAuthPassword"
-              rules={[{ required: true, message: "Please input SNMP Auth Password!" }]}
-            >
-              <Input.Password
-                name="snmpAuthPassword"
-                value={neData.snmpAuthPassword}
-                onChange={handleInputChange}
-                placeholder="SNMP Auth Password"
-              />
-            </Form.Item>
-            <Form.Item
-              name="snmpPrivProtocol"
-              rules={[{ required: true, message: "Please select SNMP Priv Protocol!" }]}
-            >
-              <Select
-                value={neData.snmpPrivProtocol}
-                onChange={(value) => handleSelectChange(value, "snmpPrivProtocol")}
-                placeholder="SNMP Priv Protocol"
-              >
-                <Option value="AES128">AES</Option>
-                <Option value="DES56">DES</Option>
-              </Select>
-            </Form.Item>
-            <Form.Item
-              name="snmpPrivPassword"
-              rules={[{ required: true, message: "Please input SNMP Priv Password!" }]}
-            >
-              <Input.Password
-                name="snmpPrivPassword"
-                value={neData.snmpPrivPassword}
-                onChange={handleInputChange}
-                placeholder="SNMP Priv Password"
-              />
-            </Form.Item>
-            <Button type="primary" htmlType="submit" onClick={handleSNMPSubmit}>
-              Submit SNMP
-            </Button>
-          </Space>
-          {isSNMPConfigured && (
-            <Button type="default" onClick={handleDiscoverNeighbors}>
-              Discover Neighbor
-            </Button>
-          )}
-        </>
+      {/* SNMP 配置表单 */}
+      <Title level={4}>Configure SNMP</Title>
+      <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+        <Form.Item
+          name="snmpUsername"
+          rules={[{ required: true, message: "Please input SNMP Username!" }]}
+        >
+          <Input
+            name="snmpUsername"
+            value={neData.snmpUsername}
+            onChange={handleInputChange}
+            placeholder="SNMP Username"
+          />
+        </Form.Item>
+        <Form.Item
+          name="snmpAuthProtocol"
+          rules={[{ required: true, message: "Please select SNMP Auth Protocol!" }]}
+        >
+          <Select
+            value={neData.snmpAuthProtocol}
+            onChange={(value) => handleSelectChange(value, "snmpAuthProtocol")}
+            placeholder="SNMP Auth Protocol"
+          >
+            <Option value="MD5">MD5</Option>
+            <Option value="SHA">SHA</Option>
+          </Select>
+        </Form.Item>
+        <Form.Item
+          name="snmpAuthPassword"
+          rules={[{ required: true, message: "Please input SNMP Auth Password!" }]}
+        >
+          <Input.Password
+            name="snmpAuthPassword"
+            value={neData.snmpAuthPassword}
+            onChange={handleInputChange}
+            placeholder="SNMP Auth Password"
+          />
+        </Form.Item>
+        <Form.Item
+          name="snmpPrivProtocol"
+          rules={[{ required: true, message: "Please select SNMP Priv Protocol!" }]}
+        >
+          <Select
+            value={neData.snmpPrivProtocol}
+            onChange={(value) => handleSelectChange(value, "snmpPrivProtocol")}
+            placeholder="SNMP Priv Protocol"
+          >
+            <Option value="AES128">AES</Option>
+            <Option value="DES56">DES</Option>
+          </Select>
+        </Form.Item>
+        <Form.Item
+          name="snmpPrivPassword"
+          rules={[{ required: true, message: "Please input SNMP Priv Password!" }]}
+        >
+          <Input.Password
+            name="snmpPrivPassword"
+            value={neData.snmpPrivPassword}
+            onChange={handleInputChange}
+            placeholder="SNMP Priv Password"
+          />
+        </Form.Item>
+        <Button type="primary" htmlType="submit" onClick={handleSNMPSubmit}>
+          OK
+        </Button>
+      </div>
+      {isSNMPConfigured && (
+        <Button type="default" onClick={handleDiscoverNeighbors}>
+          Discover Neighbor
+        </Button>
       )}
 
       {/* 显示成功或错误消息 */}

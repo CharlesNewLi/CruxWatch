@@ -197,7 +197,6 @@ export const updateNetwork = createAsyncThunk(
 );
 
 // 删除网络的 async thunk action
-// 删除网络的 async thunk action
 export const deleteNetwork = createAsyncThunk(
   "network/deleteNetwork",
   async (network_id: string, thunkAPI) => {

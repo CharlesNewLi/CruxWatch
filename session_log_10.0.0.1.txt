@@ -7,4 +7,144 @@ CR1#
 CR1#
 CR1#
 CR1#
+CR1#show running-config
+Building configuration...
+
+Current configuration : 1770 bytes
+!
+upgrade fpd auto
+version 12.4
+service timestamps debug datetime msec
+service timestamps log datetime msec
+no service password-encryption
+!
+hostname CR1
+!
+boot-start-marker
+boot-end-marker
+!
+logging message-counter syslog
+!
+no aaa new-model
+ip source-route
+ip cef
+!
+!
+!
+!
+ip domain name cisco.com
+no ipv6 cef
+!
+multilink bundle-name authenticated
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+username config privilege 15 secret 5 $1$D5my$fxweHop6PDcrMlvjy8YcA.
+archive
+ log config
+  hidekeys
+! 
+!
+!
+!
+!
+ip ssh version 2
+!
+!
+!
+!
+interface Loopback0
+ ip address 10.0.0.1 255.255.255.255
+!
+interface FastEthernet0/0
+ ip address 192.168.31.31 255.255.255.0
+ duplex half
+!
+interface FastEthernet1/0
+ description Connected to LAN
+ ip address 172.16.2.254 255.255.255.0
+ duplex half
+!
+interface FastEthernet2/0
+ description Connected to Huawei Router
+ ip address 10.0.1.2 255.255.255.252
+ duplex half
+!
+interface FastEthernet3/0
+ ip address 10.1.11.1 255.255.255.252
+ duplex half
+!
+interface FastEthernet4/0
+ no ip address
+ shutdown
+ duplex half
+!
+interface FastEthernet5/0
+ no ip address
+ shutdown
+ duplex half
+!
+interface FastEthernet6/0
+ no ip address
+ shutdown
+ duplex half
+!
+ip forward-protocol nd
+ip route 172.16.1.0 255.255.255.0 10.0.1.1
+no ip http server
+no ip http secure-server
+!
+!
+!
+!
+!
+!
+!
+!
+snmp-server group Admin v3 auth match exact 
+snmp-server group SNMPv3Group v3 auth match exact 
+snmp-server group SNMPv3Group v3 priv match exact 
+snmp-server enable traps snmp authentication linkdown linkup coldstart warmstart
+snmp-server host 192.168.31.19 version 3 auth Admin 
+!
+control-plane
+!
+!
+!
+!
+!
+!
+!
+gatekeeper
+ shutdown
+!
+!
+line con 0
+ stopbits 1
+line aux 0
+ stopbits 1
+line vty 0 4
+ login local
+ transport input ssh
+line vty 5 15
+ login local
+ transport input ssh
+!
+end
+
+CR1#
+CR1#
 CR1#exit

@@ -30,14 +30,14 @@ export const Header: React.FC = () => {
     );
   };
 
-  const networksOnlineStats = useSelector((state) => state.networks.data);
+  const networksStats = useSelector((state) => state.networks.data);
   const networksLoading = useSelector((state) => state.networks.loading);
   const networksError = useSelector((state) => state.networks.error);
 
-  // 从 networksOnlineStats中读取总计的数据
-  const totalOnlineNetworks = networksOnlineStats?.total_online_networks ?? 0;
-  const totalOnlineSites = networksOnlineStats?.total_online_sites ?? 0;
-  const totalOnlineNes = networksOnlineStats?.total_online_nes ?? 0;
+  // 从 networksStats中读取总计的数据
+  const totalNetworks = networksStats?.total_networks ?? 0;
+  const totalSites = networksStats?.total_sites ?? 0;
+  const totalNes = networksStats?.total_nes ?? 0;
 
 
   return (
@@ -62,15 +62,15 @@ export const Header: React.FC = () => {
         </div>
         <div className={styles["stats-header"]}>
           <div className={styles["stats-item"]}>
-            <div className={styles["stats-number"]}>{totalOnlineNetworks}</div>
+            <div className={styles["stats-number"]}>{totalNetworks}</div>
             <div className={styles["stats-label"]}>Network(s)</div>
           </div>
           <div className={styles["stats-item"]}>
-            <div className={styles["stats-number"]}>{totalOnlineSites}</div>
+            <div className={styles["stats-number"]}>{totalSites}</div>
             <div className={styles["stats-label"]}>Site(s)</div>
           </div>
           <div className={styles["stats-item"]}>
-            <div className={styles["stats-number"]}>{totalOnlineNes}</div>
+            <div className={styles["stats-number"]}>{totalNes}</div>
             <div className={styles["stats-label"]}>Device(s)</div>
           </div>
         </div>      

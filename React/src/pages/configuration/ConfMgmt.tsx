@@ -61,13 +61,16 @@ export const ConfMgmt: React.FC = () => {
         </Sider> 
 
         <Content className={styles.content}>
+          {selectedNetwork ? (
             <DeviceConfigPanel
             networkName={selectedNetworkName || "Unnamed Network"}
             networkId={selectedNetwork || " "}
             />
+          ) : (
             <div className={styles.placeholder}>
                 <Title level={4}>No network selected.</Title>
             </div>
+          )}
         </Content>
       </Layout>
 

@@ -1,9 +1,10 @@
 import React, { useState, useMemo } from "react";
 import { Typography, Space, Button } from "antd";
 import { useSelector } from "../../redux/hooks"; 
+import { useNavigate } from "react-router-dom";
 import { TopoView } from "../../components/topoView"; 
 import { DeviceConfigModal } from "../../components/deviceConfig/DeviceConfigModal";
-import { SettingOutlined, ReloadOutlined, AlertOutlined } from "@ant-design/icons";
+import { ClusterOutlined, LineChartOutlined, AlertOutlined, SafetyOutlined } from "@ant-design/icons";
 import styles from "./DeviceConfigPanel.module.css";
 
 const { Title } = Typography;
@@ -35,21 +36,7 @@ export const DeviceConfigPanel: React.FC<DeviceConfigPanelProps> = ({
 
   const [selectedDevice, setSelectedDevice] = useState<any | null>(null); // 当前选中的设备
   const [modalVisible, setModalVisible] = useState(false); // 控制弹出框显示
-
-  // Handle configuration button click (for device config)
-  const handleConfigureDevice = () => {
-    console.log("Device configuration clicked");
-  };
-
-  // Handle reload button click (to refresh topology)
-  const handleReloadNetwork = () => {
-    console.log("Reload network clicked");
-  };
-
-  // Handle alert button click (to check for issues)
-  const handleAlertCheck = () => {
-    console.log("Alert check clicked");
-  };
+  const navigate = useNavigate();
 
    // 处理点击设备
    const handleDeviceClick = (device: any) => {
@@ -65,12 +52,16 @@ export const DeviceConfigPanel: React.FC<DeviceConfigPanelProps> = ({
 
   return (
     <div className={styles.panel}>
-      <Title level={4}>{networkName} Management</Title>
+      {/* Center the title */}
+      <div style={{ textAlign: "center" }}>
+        <Title level={4}>{networkName} Configuration Management</Title>
+      </div>
       
       <Space className={styles.buttonSpace}>
-        <Button icon={<SettingOutlined />} onClick={handleConfigureDevice}>Configure Device</Button>
-        <Button icon={<ReloadOutlined />} onClick={handleReloadNetwork}>Reload</Button>
-        <Button icon={<AlertOutlined />} onClick={handleAlertCheck}>Check Alerts</Button>
+        <Button icon={<ClusterOutlined />} onClick={() => navigate("/networks")}></Button>
+        <Button icon={<LineChartOutlined />} onClick={() => navigate("/performance")}></Button>
+        <Button icon={<AlertOutlined />} onClick={() => navigate("/fault")}></Button>
+        <Button icon={<SafetyOutlined />} onClick={() => navigate("/security")}></Button>
       </Space>
 
       {/* Topology View */}

@@ -10,9 +10,6 @@ const initialState: NetworksState = {
     networks: [], // 初始化为空数组
     total_nes: 0,
     total_networks: 0,
-    total_online_networks: 0,
-    total_online_nes: 0,
-    total_online_sites: 0,
     total_sites: 0,
   },
 };
@@ -54,8 +51,6 @@ export const getNetworks = createAsyncThunk(
         networks: finalNetworks,
         total_nes: data.total_nes,
         total_networks: data.total_networks,
-        total_online_nes: data.total_online_nes,
-        total_online_sites: data.total_online_sites,
         total_sites: data.total_sites,
       };
     } catch (error: any) {
@@ -194,9 +189,6 @@ export const updateNetworksSummary = createAsyncThunk(
       networks: updatedNetworks, // 返回新的 networks 数组
       total_nes,
       total_networks,
-      total_online_networks: state.networks?.data?.total_online_networks || 0,
-      total_online_nes: state.networks?.data?.total_online_nes || 0,
-      total_online_sites: state.networks?.data?.total_online_sites || 0,
       total_sites,
     };
   }
@@ -241,8 +233,6 @@ export const networksSlice = createSlice({
         state.data.networks = action.payload.networks;
         state.data.total_nes = action.payload.total_nes;
         state.data.total_networks = action.payload.total_networks;
-        state.data.total_online_nes = action.payload.total_online_nes;
-        state.data.total_online_sites = action.payload.total_online_sites;
         state.data.total_sites = action.payload.total_sites;
 
         state.loading = false;
@@ -258,8 +248,6 @@ export const networksSlice = createSlice({
         state.data.networks = action.payload.networks;
         state.data.total_nes = action.payload.total_nes;
         state.data.total_networks = action.payload.total_networks;
-        state.data.total_online_nes = action.payload.total_online_nes;
-        state.data.total_online_sites = action.payload.total_online_sites;
         state.data.total_sites = action.payload.total_sites;
       })
 
