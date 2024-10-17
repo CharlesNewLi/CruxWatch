@@ -2,13 +2,10 @@
 Warning: The initial password poses security risks.
 The password needs to be changed. Change now? [Y/N]:N
 
-Info: The max number of VTY users is 5, the number of current VTY users online is 1, and total number of terminal users online is 2.
-      The current login time is 2024-10-03 21:16:27.
-      The last login time is 2024-10-03 21:14:51 from 192.168.31.19 through SSH.
+Info: The max number of VTY users is 5, the number of current VTY users online is 2, and total number of terminal users online is 3.
+      The current login time is 2024-10-04 08:48:12.
+      The last login time is 2024-10-04 08:47:28 from 192.168.31.19 through SSH.
 <HR1>
-<HR1>
-<HR1>screen-length 0 temporary
-Info: The configuration takes effect on the current user terminal interface only.
 <HR1>
 <HR1>screen-length 0 temporary
 Info: The configuration takes effect on the current user terminal interface only.
@@ -26,16 +23,16 @@ Warning: The initial password poses security risks.
 The password needs to be changed. Change now? [Y/N]:N
 
 Info: The max number of VTY users is 5, the number of current VTY users online is 1, and total number of terminal users online is 2.
-      The current login time is 2024-10-03 21:16:43.
-      The last login time is 2024-10-03 21:05:47 from 10.2.12.1 through SSH.
+      The current login time is 2024-10-04 08:48:29.
+      The last login time is 2024-10-03 21:16:42 from 10.2.12.1 through SSH.
 <CE1>
 <CE1>
 <CE1>
 <CE1>
 <CE1>
-<CE1>dis current-config
+<CE1>dis current-configuration
 !Software Version V200R005C10SPC607B607
-!Last configuration was updated at 2024-10-03 19:01:54+00:00 by SYSTEM automatically
+!Last configuration was updated at 2024-10-04 08:32:49+00:00 by SYSTEM automatically
 !Last configuration was saved at 2024-09-28 19:15:50+00:00
 #
 sysname CE1
